@@ -1,0 +1,21 @@
+{
+  "name": "Alex Example",
+  "intro": "a Computer Science student (graduating 2028) based in Lisbon",
+  "role_pitch": "a remote Backend or Platform Engineering intern.",
+  "experience": "Most recently I interned at ExampleCo, where I built REST endpoints and trimmed slow database queries.",
+  "stack": "Python, FastAPI, PostgreSQL and TypeScript",
+  "portfolio": "https://example.dev",
+  "github": "https://github.com/example",
+  "linkedin": "https://linkedin.com/in/example",
+  "resume": "https://example.dev/resume.pdf",
+  "phone": "",
+  "subject": "Backend engineering internship - {company}",
+  "closing": "If it would be useful, I'm happy to share more detail or jump on a short call.",
+  "projects": {
+    "DevTools": ["I built ExampleScan, a CLI that checks dependencies against public advisory feeds."],
+    "Fintech": ["I built ExamplePay, a payments ledger service with idempotent transaction APIs on PostgreSQL."],
+    "AI Agents": ["I built ExampleAgent, a tool-calling agent loop with typed guardrails."],
+    "B2B SaaS": ["I built ExampleCRM, a multi-tenant API with role-based access."],
+    "Other": ["I built ExampleCRM, a multi-tenant API with role-based access."]
+  }
+}
