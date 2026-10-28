@@ -36,9 +36,10 @@ def build_raw_message(to: str, subject: str, body: str) -> str:
 
 
 class GmailDraftClient:
-    def __init__(self, credentials_file: Path, token_file: Path) -> None:
+    def __init__(self, credentials_file: Path, token_file: Path, headless: bool = False) -> None:
         self.credentials_file = credentials_file
         self.token_file = token_file
+        self.headless = headless
         self._service: Optional[Any] = None
 
     def _credentials(self) -> Credentials:
@@ -54,6 +55,11 @@ class GmailDraftClient:
                 return creds
             except RefreshError:
                 log.warning("Saved Gmail token expired or was revoked; re-authorising.")
+        if self.headless:
+            raise GmailError(
+                "No valid Gmail token and HEADLESS is set, so no browser sign-in is possible. "
+                "Run once on your own machine to create a fresh token.json, then update the server's copy."
+            )
         if not self.credentials_file.exists():
             raise GmailError(
                 f"{self.credentials_file.name} not found. Download an OAuth 'Desktop app' client from "

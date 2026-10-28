@@ -1,4 +1,4 @@
-"""startup-outreach-agent CLI.
+"""seedreach CLI.
 
     python main.py run --limit 5
     python main.py target https://useshiplog.com
@@ -34,7 +34,7 @@ _STYLE = {"drafted": "green", "skipped": "yellow", "duplicate": "dim", "error": 
 def _setup(verbose: bool = typer.Option(False, "--verbose", "-v", help="Debug logging.")) -> None:
     level = logging.DEBUG if verbose else getattr(logging, get_settings().log_level.upper(), logging.INFO)
     logging.basicConfig(level=level, format="%(message)s", handlers=[RichHandler(console=console, show_path=False)])
-    for noisy in ("httpx", "httpcore", "googleapiclient", "urllib3", "anthropic"):
+    for noisy in ("httpx", "httpcore", "googleapiclient", "urllib3", "anthropic", "google_genai"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
@@ -58,11 +58,14 @@ def _report(result: Result) -> None:
         console.print(Panel(result.draft.body, title=f"Subject: {result.draft.subject}", expand=False))
 
 
-def _summary(results: list[Result]) -> None:
+def _summary(results: list[Result], dry_run: bool) -> dict[str, int]:
     counts = {k: sum(r.outcome == k for r in results) for k in ("drafted", "skipped", "error")}
     console.print(f"\nDone: {counts['drafted']} drafted, {counts['skipped']} skipped, {counts['error']} errors.")
-    if counts["drafted"]:
+    if dry_run:
+        console.print("Dry run: nothing was saved to Gmail or the database.")
+    elif counts["drafted"]:
         console.print("Review them in Gmail > Drafts. Nothing has been sent.")
+    return counts
 
 
 @app.command()
@@ -78,7 +81,9 @@ def run(
     except ValueError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(2)
-    _summary(results)
+    counts = _summary(results, dry_run)
+    if counts["error"] and not counts["drafted"]:
+        raise typer.Exit(1)  # every attempt failed (LLM or Gmail outage): let schedulers flag the run
 
 
 @app.command()

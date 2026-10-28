@@ -55,12 +55,13 @@ class Pipeline:
         self.scraper = Scraper(settings)
         self.extractor = Extractor(settings)
         self.finder = EmailFinder(settings)
-        self.gmail = GmailDraftClient(settings.google_credentials_file, settings.google_token_file)
+        self.gmail = GmailDraftClient(settings.google_credentials_file, settings.google_token_file, settings.headless)
         if not dry_run:
             self.gmail.ensure_authenticated()  # fail before spending LLM credits
 
     def _record(self, level: str, domain: str, message: str) -> None:
-        log.log(getattr(logging, level), "%s: %s", domain, message)
+        # the CLI already prints a status line per company, so routine events only go to debug output
+        log.log(logging.DEBUG if level == "INFO" else getattr(logging, level), "%s: %s", domain, message)
         if not self.dry_run:
             self.db.log(level, message, domain)
 

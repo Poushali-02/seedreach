@@ -1,4 +1,4 @@
-# startup-outreach-agent
+# seedreach
 
 A CLI that finds early-stage startups, reads their website with an LLM, finds a founder's email, and
 saves a personalized plain-text cold email to your **Gmail Drafts** for you to review and send yourself.
@@ -36,14 +36,14 @@ This tool writes email to real people, so please use it with care:
 
 ```bash
 git clone <your-fork-url>
-cd startup-outreach-agent
+cd seedreach
 python -m venv .venv
 # Windows PowerShell:  .venv\Scripts\Activate.ps1
 # macOS / Linux:       source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-On Windows, keep the project in a short path such as `C:\dev\startup-outreach-agent`. Very long folder
+On Windows, keep the project in a short path such as `C:\dev\seedreach`. Very long folder
 paths make `pip` fail inside the venv.
 
 ### 2. Describe yourself in `profile.json`
@@ -151,6 +151,46 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
 - **Dedupe**: one row per registrable domain, plus a unique index on drafted emails. Drafted and skipped
   companies are never processed again (use `target <url> --force` to retry a skipped one). LLM or Gmail
   outages are not recorded as skips, so those companies are retried next time.
+
+## Run it on a schedule (free, GitHub Actions)
+
+Your laptop does not need to be on. A small **private** repo runs seedreach on a schedule, pulls this
+code at run time, and keeps `outreach.db` on a `state` branch so nobody is drafted twice.
+It must be private: Actions logs and the database contain founder email addresses.
+
+1. **Stop the Gmail token expiring.** In Google Cloud > Google Auth Platform > Audience, click
+   **Publish app** (status "In production"). You stay the only user and no verification is needed for
+   personal use. Tokens issued while the app was in Testing still expire after 7 days, so delete
+   `token.json` and run `python main.py run --limit 1` once locally: it opens the browser to sign in
+   again and writes a fresh, long-lived `token.json`.
+2. **Create the private repo** with the workflow:
+   ```bash
+   gh repo create seedreach-runner --private
+   ```
+   Copy [`examples/github-actions-runner.yml`](examples/github-actions-runner.yml) to
+   `.github/workflows/seedreach.yml` in it, and push to `main`.
+3. **Create the `state` branch** holding your current database (or an empty one):
+   ```bash
+   git switch --orphan state
+   cp /path/to/seedreach/outreach.db .
+   git add outreach.db && git commit -m "initial state" && git push -u origin state
+   ```
+4. **Add secrets** (Settings > Secrets and variables > Actions), from your local files:
+   ```bash
+   gh secret set GMAIL_TOKEN       -R you/seedreach-runner < token.json
+   gh secret set GMAIL_CREDENTIALS -R you/seedreach-runner < credentials.json
+   gh secret set PROFILE_JSON      -R you/seedreach-runner < profile.json
+   gh secret set GEMINI_API_KEY    -R you/seedreach-runner      # paste the key when prompted
+   ```
+   Optional: `ANTHROPIC_API_KEY`, `APOLLO_API_KEY`, and repo variables `LLM_PROVIDER` / `GEMINI_MODEL`.
+5. **Test it:** Actions tab > seedreach > Run workflow, with "dry run" ticked.
+
+Control: change the `cron:` line for timing, use **Run workflow** for an on-demand run with its own
+limit and source, and **Disable workflow** to pause. GitHub emails you when a run fails (for example,
+a Gmail token that needs renewing: the run fails fast with `HEADLESS` in the error, never hangs).
+
+Once the runner is live, do your real runs there rather than locally, or your local `outreach.db` and the
+runner's copy drift apart and could draft the same founder twice.
 
 ## Troubleshooting
 

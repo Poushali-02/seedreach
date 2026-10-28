@@ -198,3 +198,9 @@ def test_extractor_requires_key_for_chosen_provider():
         Extractor(Settings(llm_provider="gemini", gemini_api_key=""))
     with pytest.raises(ExtractionError, match="ANTHROPIC_API_KEY"):
         Extractor(Settings(llm_provider="anthropic", anthropic_api_key=""))
+
+
+def test_gmail_headless_never_opens_browser(tmp_path: Path):
+    client = gmail_client.GmailDraftClient(tmp_path / "credentials.json", tmp_path / "token.json", headless=True)
+    with pytest.raises(gmail_client.GmailError, match="HEADLESS"):
+        client.ensure_authenticated()
