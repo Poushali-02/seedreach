@@ -1,5 +1,18 @@
 # seedreach
 
+[![tests](https://github.com/Poushali-02/seedreach/actions/workflows/tests.yml/badge.svg)](https://github.com/Poushali-02/seedreach/actions/workflows/tests.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
+
+Finds early-stage startups that are hiring, reads what they build, finds a founder's email, and saves a
+personalised cold email to your **Gmail Drafts**. You review it and press Send. It never sends anything itself.
+
+![seedreach live run: leads stream through the terminal while drafts land in Gmail](docs/demo.gif)
+
+[Watch the full 80-second demo with sound (MP4)](https://github.com/Poushali-02/seedreach/releases/download/v0.1.0/seedreach-demo.mp4)
+
+> **Status:** early (v0.1). Built for my own internship search and maintained in my spare time.
+> Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 A CLI that finds early-stage startups, reads their website with an LLM, finds a founder's email, and
 saves a personalized plain-text cold email to your **Gmail Drafts** for you to review and send yourself.
 
@@ -212,7 +225,8 @@ pytest
 ```
 
 Tests use `profile.example.json` and mock all network and LLM calls, so they need no keys. CI runs them on
-Python 3.10 and 3.13. Pull requests are welcome; please keep drafts-only behaviour intact.
+Python 3.10 and 3.13. Pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) for the ground
+rules (drafts only, a human always sends). Security reports go through [SECURITY.md](SECURITY.md).
 
 ```
 main.py                      Typer CLI

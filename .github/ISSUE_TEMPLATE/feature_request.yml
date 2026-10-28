@@ -1,0 +1,15 @@
+name: Feature request
+description: Suggest an improvement or a new lead source
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What do you have in mind?
+      description: Note that seedreach will stay drafts-only with a human pressing Send.

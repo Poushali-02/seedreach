@@ -8,3 +8,6 @@ token.json
 outreach.db
 
 profile.json
+
+# demo videos are attached to releases, not committed
+docs/*.mp4
