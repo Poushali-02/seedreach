@@ -146,7 +146,7 @@ class Pipeline:
             handle(row["url"], row["source"], None)
 
         for provider in build_providers(self.settings, source):
-            for lead in provider.fetch(limit * 8):
+            for lead in provider.iter_leads():
                 if drafted >= limit or attempts >= max_attempts:
                     return results
                 try:

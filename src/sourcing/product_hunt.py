@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Iterator, Optional
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import feedparser
@@ -53,26 +53,21 @@ class ProductHuntProvider(BaseSourcingProvider):
             log.debug("PH resolve failed for %s: %s", post_url, exc)
         return None
 
-    def fetch(self, limit: int) -> list[Lead]:
+    def iter_leads(self) -> Iterator[Lead]:
         try:
             resp = self.client.get(FEED_URL)
             resp.raise_for_status()
         except httpx.HTTPError as exc:
             log.warning("Product Hunt feed unavailable: %s", exc)
-            return []
+            return
 
-        leads: list[Lead] = []
         for entry in feedparser.parse(resp.content).entries:
-            if len(leads) >= limit:
-                break
-            website = self._resolve_website(entry.get("link", ""))
+            website = self._resolve_website(entry.get("link", ""))  # one request per entry, so resolve lazily
             if not website:
                 continue
             summary = BeautifulSoup(entry.get("summary", ""), "html.parser").get_text(" ")
-            leads.append(Lead(
+            yield Lead(
                 url=website, source=self.name,
                 name_hint=strip_markdown(entry.get("title", ""))[:80] or None,
                 context=strip_markdown(summary)[:300],
-            ))
-        log.info("Product Hunt: %d leads resolved", len(leads))
-        return leads
+            )

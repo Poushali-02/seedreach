@@ -204,3 +204,32 @@ def test_gmail_headless_never_opens_browser(tmp_path: Path):
     client = gmail_client.GmailDraftClient(tmp_path / "credentials.json", tmp_path / "token.json", headless=True)
     with pytest.raises(gmail_client.GmailError, match="HEADLESS"):
         client.ensure_authenticated()
+
+
+def test_run_reads_past_known_leads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """A growing database must not stall runs: known companies are skipped for free."""
+    import src.pipeline as pipeline
+    from src.sourcing.base import BaseSourcingProvider, Lead
+
+    db = Database(tmp_path / "t.db")
+    for i in range(30):
+        db.mark_skipped(f"old{i}.com", f"https://old{i}.com", "hn", "seen before")
+
+    class FakeHN(BaseSourcingProvider):
+        name = "hn"
+
+        def iter_leads(self):
+            for i in range(30):
+                yield Lead(url=f"https://old{i}.com", source="hn")
+            yield Lead(url="https://fresh.io", source="hn")
+
+    monkeypatch.setattr(pipeline, "build_providers", lambda settings, source: [FakeHN()])
+    pipe = pipeline.Pipeline.__new__(pipeline.Pipeline)
+    pipe.settings, pipe.db, pipe.dry_run = Settings(), db, True
+    processed = []
+    pipe.process = lambda url, src, hint=None, force=False: processed.append(url) or pipeline.Result(
+        domain_of(url), "drafted", "ok")
+
+    pipe.run(limit=1)
+    assert processed == ["https://fresh.io"]
+    assert FakeHN().fetch(3) == [Lead(url=f"https://old{i}.com", source="hn") for i in range(3)]

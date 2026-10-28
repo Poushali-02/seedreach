@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
 from urllib.parse import urlparse
 
 import httpx
@@ -92,9 +92,8 @@ class HackerNewsProvider(BaseSourcingProvider):
             if h.get("title", "").startswith("Ask HN: Who is hiring?")
         ][:count]
 
-    def fetch(self, limit: int) -> list[Lead]:
+    def iter_leads(self) -> Iterator[Lead]:
         cutoff = int(time.time()) - self.settings.hn_lookback_days * 86400
-        leads: list[Lead] = []
         seen_ids: set[str] = set()
         seen_urls: set[str] = set()
 
@@ -115,8 +114,4 @@ class HackerNewsProvider(BaseSourcingProvider):
                     lead = parse_job_comment(hit.get("comment_text") or "")
                     if lead and lead.url not in seen_urls:
                         seen_urls.add(lead.url)
-                        leads.append(lead)
-                if len(leads) >= limit:
-                    return leads[:limit]
-        log.info("HN: %d leads matched", len(leads))
-        return leads[:limit]
+                        yield lead
