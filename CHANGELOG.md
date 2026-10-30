@@ -9,8 +9,11 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 - The scheduled-runs template (`examples/github-actions-runner.yml`) now pins `SEEDREACH_REF` to a release
   instead of running `main`, because the job holds your Gmail token.
 
+- CI uses `actions/checkout` and `actions/setup-python` v7 (off the deprecated Node 20 runtime).
+
 ### Added
-- Dependabot: weekly grouped update PRs for Python packages and GitHub Actions.
+- Dependabot: weekly grouped update PRs for Python packages and GitHub Actions. For Python it only
+  changes a requirement when its `>=` range would block a new release, never just to raise minimums.
 - This changelog.
 
 ## [0.1.0] - 2026-10-28
