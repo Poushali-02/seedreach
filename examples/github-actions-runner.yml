@@ -33,6 +33,9 @@ permissions:
 
 env:
   SEEDREACH_REPO: Poushali-02/seedreach   # the code to run; change if you use a fork
+  # Pin to a release you have reviewed, never main: this job holds your Gmail token, so it should only
+  # run code you trust. To upgrade, read the new release, then bump this tag.
+  SEEDREACH_REF: v0.1.0
 
 jobs:
   run:
@@ -49,6 +52,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.SEEDREACH_REPO }}
+          ref: ${{ env.SEEDREACH_REF }}
           path: app
 
       - uses: actions/setup-python@v5
