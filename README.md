@@ -198,6 +198,10 @@ It must be private: Actions logs and the database contain founder email addresse
    Optional: `ANTHROPIC_API_KEY`, `APOLLO_API_KEY`, and repo variables `LLM_PROVIDER` / `GEMINI_MODEL`.
 5. **Test it:** Actions tab > seedreach > Run workflow, with "dry run" ticked.
 
+The template pins `SEEDREACH_REF` to a release (for example `v0.1.0`) rather than running `main`. The job
+holds your Gmail token, so it should only ever run code you have reviewed. To upgrade, read the new
+release's notes, bump `SEEDREACH_REF`, push, and do a dry run.
+
 Control: change the `cron:` line for timing, use **Run workflow** for an on-demand run with its own
 limit and source, and **Disable workflow** to pause. GitHub emails you when a run fails (for example,
 a Gmail token that needs renewing: the run fails fast with `HEADLESS` in the error, never hangs).
