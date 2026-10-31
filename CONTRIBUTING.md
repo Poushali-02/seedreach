@@ -37,10 +37,12 @@ and 3.13 (CI runs both).
 - Keep the style of the surrounding code: type hints, small functions, comments only where the
   reason isn't obvious.
 - Add or update a test for any behaviour change.
-- Try it end to end with `python main.py target <url> --dry-run` (prints the draft, touches nothing).
+- Try it end to end with `python main.py target <url> --dry-run` (prints the draft, touches nothing),
+  and paste the output in your PR.
 
 Not sure where to start? The pinned **Roadmap** issue lists what's planned, and issues labelled
-`good first issue` are self-contained. Comment on an issue before you start so nobody duplicates work.
+`good first issue` are self-contained. Comment on an issue before you start so nobody duplicates work,
+and please wait to be assigned before opening a PR for it: the maintainer may ask for a short plan first.
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains how a run works and walks through adding a new
 lead source step by step.
 

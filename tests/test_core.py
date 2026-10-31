@@ -317,3 +317,16 @@ def test_run_mixes_sources_and_skips_repeats(tmp_path: Path, monkeypatch: pytest
     pipe.run(limit=5)
     # turns alternate yc, hn, yc, hn; the second a.dev (from hn) is skipped as a repeat
     assert processed == [("yc", "https://a.dev"), ("yc", "https://b.dev"), ("hn", "https://c.dev")]
+
+
+# ---- CLI ---------------------------------------------------------------
+def test_cli_starts_and_lists_commands():
+    # Imported here so a broken main.py (e.g. a SyntaxError) fails this test by name.
+    from typer.testing import CliRunner
+
+    import main
+
+    result = CliRunner().invoke(main.app, ["--help"])
+    assert result.exit_code == 0, result.output
+    for command in ("run", "target", "add-target", "status"):
+        assert command in result.output
