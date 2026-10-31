@@ -7,7 +7,9 @@
 
 Drafts are only ever saved to Gmail Drafts; nothing is sent automatically.
 """
-
+from src.outreach.generator import generate_linkedin_note
+from src.profile import load_profile
+from src.config import ROOT
 from __future__ import annotations
 
 import logging
@@ -54,9 +56,30 @@ def _report(result: Result) -> None:
     style = _STYLE.get(result.outcome, "white")
     to = f" -> {result.to}" if result.to else ""
     console.print(f"[{style}]{result.outcome.upper():9}[/{style}] {result.domain}{to}  [dim]{result.detail}[/dim]")
+    
     if result.draft and "dry run" in result.detail:
         console.print(Panel(result.draft.body, title=f"Subject: {result.draft.subject}", expand=False))
-
+        
+        # --- NEW: Show the LinkedIn Connection Note ---
+        # We load the example profile just to demonstrate the note format
+        try:
+            profile = load_profile(ROOT / "profile.example.json")
+            # Create a fake company object based on the result domain
+            from src.intelligence.extractor import CompanyProfile
+            fake_company = CompanyProfile(
+                company_name=result.domain.split('.')[0].capitalize(),
+                one_line_summary="",
+                core_domain="Other",
+                founder_first_name="Founder",
+                founder_last_name=None,
+                personalized_hook=f"I was checking out your recent work at {result.domain}."
+            )
+            note = generate_linkedin_note(fake_company, profile)
+            console.print(Panel(note, title="LinkedIn Connection Note (Draft)", expand=False))
+        except Exception as e:
+            # Failsafe so we don't crash the whole CLI if the example profile is missing
+            pass
+        # ----------------------------------------------
 
 def _summary(results: list[Result], dry_run: bool) -> dict[str, int]:
     counts = {k: sum(r.outcome == k for r in results) for k in ("drafted", "skipped", "error")}

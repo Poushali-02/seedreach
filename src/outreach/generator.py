@@ -52,3 +52,23 @@ def generate_email(company: CompanyProfile, profile: Profile) -> EmailDraft:
     _assert_plain_text(body)
     _assert_plain_text(subject)
     return EmailDraft(subject=subject, body=body)
+
+def generate_linkedin_note(company: CompanyProfile, profile: Profile) -> str:
+    """Draft a plain-text LinkedIn connection note under 300 characters."""
+    name = strip_markdown(company.company_name)
+    first = strip_markdown(company.founder_first_name) if company.founder_first_name else ""
+    greeting = f"Hi {first}, " if first else f"Hi {name} team, "
+
+    hook = strip_markdown(company.personalized_hook)
+    intro = f"I'm {profile.first_name}, {profile.intro}."
+    closing = "I'd love to connect!"
+    
+    # 1. Try building the full note
+    note = f"{greeting}{hook} {intro} {closing}"
+    
+    # 2. If it's too long, chop the whole string to 296 chars and add "..."
+    if len(note) > 300:
+        note = note[:296].strip() + "..."
+        
+    _assert_plain_text(note)
+    return note
