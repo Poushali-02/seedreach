@@ -237,7 +237,9 @@ pytest
 
 Tests use `profile.example.json` and mock all network and LLM calls, so they need no keys. CI runs them on
 Python 3.10 and 3.13. Pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) for the ground
-rules (drafts only, a human always sends). Security reports go through [SECURITY.md](SECURITY.md).
+rules (drafts only, a human always sends) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the code
+fits together. The pinned Roadmap issue lists what's planned. Security reports go through
+[SECURITY.md](SECURITY.md).
 
 ```
 main.py                      Typer CLI

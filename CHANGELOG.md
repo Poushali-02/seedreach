@@ -13,6 +13,8 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 - Dependabot: weekly grouped update PRs for Python packages and GitHub Actions. For Python it only
   changes a requirement when its `>=` range would block a new release, never just to raise minimums.
 - This changelog.
+- Contributor docs: `docs/ARCHITECTURE.md` (how a run works, how to add a source), a pull-request
+  template and a code of conduct.
 
 ### Changed
 - The scheduled-runs template (`examples/github-actions-runner.yml`) pins `SEEDREACH_REF` to a release

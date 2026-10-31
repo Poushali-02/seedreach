@@ -39,8 +39,12 @@ and 3.13 (CI runs both).
 - Add or update a test for any behaviour change.
 - Try it end to end with `python main.py target <url> --dry-run` (prints the draft, touches nothing).
 
-Good first areas: new lead sources (implement `BaseSourcingProvider.iter_leads`), better company-stage
-filtering, and more reliable email discovery.
+Not sure where to start? The pinned **Roadmap** issue lists what's planned, and issues labelled
+`good first issue` are self-contained. Comment on an issue before you start so nobody duplicates work.
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains how a run works and walks through adding a new
+lead source step by step.
+
+Please also follow the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Reporting security issues
 
