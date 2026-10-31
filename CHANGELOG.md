@@ -5,6 +5,10 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-31
+
+More places to find startups, and a project that's ready for contributors.
+
 ### Added
 - Two new lead sources: the **YC directory** (`--source yc`: hiring, active YC companies of 25 people or
   fewer, remote-friendly first) and **Launch HN** (`--source launchhn`: recent launches on Hacker News).
@@ -38,5 +42,6 @@ First public release.
 - `HEADLESS` mode and a GitHub Actions template for scheduled runs from a private repo.
 - Contributing guide, security policy, issue templates and CI on Python 3.10 and 3.13.
 
-[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Poushali-02/seedreach/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Poushali-02/seedreach/releases/tag/v0.1.0
