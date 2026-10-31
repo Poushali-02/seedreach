@@ -5,6 +5,9 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+### Added
+- LinkedIn connection note generation (`generate_linkedin_note`), limited to 300 plain-text characters.
+
 ## [0.2.0] - 2026-10-31
 
 More places to find startups, and a project that's ready for contributors.
