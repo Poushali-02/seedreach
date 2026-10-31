@@ -5,16 +5,19 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
-### Changed
-- The scheduled-runs template (`examples/github-actions-runner.yml`) now pins `SEEDREACH_REF` to a release
-  instead of running `main`, because the job holds your Gmail token.
-
-- CI uses `actions/checkout` and `actions/setup-python` v7 (off the deprecated Node 20 runtime).
-
 ### Added
+- Two new lead sources: the **YC directory** (`--source yc`: hiring, active YC companies of 25 people or
+  fewer, remote-friendly first) and **Launch HN** (`--source launchhn`: recent launches on Hacker News).
+- `--source all` (the default) now takes turns between sources instead of draining one before the next,
+  and never processes the same company twice in a run.
 - Dependabot: weekly grouped update PRs for Python packages and GitHub Actions. For Python it only
   changes a requirement when its `>=` range would block a new release, never just to raise minimums.
 - This changelog.
+
+### Changed
+- The scheduled-runs template (`examples/github-actions-runner.yml`) pins `SEEDREACH_REF` to a release
+  instead of running `main`, because the job holds your Gmail token, and defaults to `all` sources.
+- CI uses `actions/checkout` and `actions/setup-python` v7 (off the deprecated Node 20 runtime).
 
 ## [0.1.0] - 2026-10-28
 

@@ -17,8 +17,8 @@ on:
       source:
         description: "Where to find startups"
         type: choice
-        options: [hn, producthunt, all]
-        default: hn
+        options: [all, yc, launchhn, hn, producthunt]
+        default: all
       dry_run:
         description: "Print drafts only; save nothing"
         type: boolean
@@ -86,7 +86,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           APOLLO_API_KEY: ${{ secrets.APOLLO_API_KEY }}
           LIMIT: ${{ inputs.limit || '5' }}
-          SOURCE: ${{ inputs.source || 'hn' }}
+          SOURCE: ${{ inputs.source || 'all' }}
           DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
         run: python main.py run --limit "$LIMIT" --source "$SOURCE" $DRY_RUN
 
