@@ -133,7 +133,7 @@ python main.py run --limit 10 --dry-run
 
 # Real run: saves drafts to Gmail and records each company so it is never drafted twice
 python main.py run --limit 5
-python main.py run --limit 5 --source hn          # hn | producthunt | all
+python main.py run --limit 5 --source yc          # all | yc | launchhn | hn | producthunt
 
 # Queue your own list; the next `run` processes these before sourced leads
 python main.py add-target site1.com site2.io
@@ -149,7 +149,14 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
 
 ## How it works
 
-- **Hacker News**: finds the latest two "Ask HN: Who is hiring?" threads, then searches their comments for
+- **YC directory** (`yc`): Y Combinator companies marked as hiring, active and small (25 people or fewer,
+  `YC_MAX_TEAM_SIZE`), remote-friendly ones first, then the newest batches. Data comes from the
+  community-maintained [yc-oss](https://github.com/yc-oss/api) mirror of YC's public directory.
+- **Launch HN** (`launchhn`): startups announcing their launch on Hacker News in the last 120 days
+  (`LAUNCHHN_LOOKBACK_DAYS`), using the company link from the post.
+- **Mixing** (`all`, the default): sources take turns, so one run draws on all of them, and no company is
+  processed twice in a run.
+- **Hacker News** (`hn`): finds the latest two "Ask HN: Who is hiring?" threads, then searches their comments for
   remote roles mentioning backend, Python, AI/ML, intern, forward-deployed or systems. Links to job boards
   are ignored; only the company's own site is used. (The `whoishiring` account only posts the thread, so
   searching its own comments returns nothing; the job posts are replies by other users.)

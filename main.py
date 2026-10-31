@@ -71,7 +71,7 @@ def _summary(results: list[Result], dry_run: bool) -> dict[str, int]:
 @app.command()
 def run(
     limit: int = typer.Option(5, "--limit", "-n", min=1, help="Stop after this many drafts."),
-    source: str = typer.Option("all", "--source", "-s", help="all | hn | producthunt"),
+    source: str = typer.Option("all", "--source", "-s", help="all | yc | launchhn | hn | producthunt"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print drafts; skip Gmail and don't touch the database."),
 ) -> None:
     """Fetch new leads, enrich them, and save drafts to Gmail."""

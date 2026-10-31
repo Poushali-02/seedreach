@@ -233,3 +233,87 @@ def test_run_reads_past_known_leads(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     pipe.run(limit=1)
     assert processed == ["https://fresh.io"]
     assert FakeHN().fetch(3) == [Lead(url=f"https://old{i}.com", source="hn") for i in range(3)]
+
+
+# ---- extra sources: YC directory, Launch HN, mixing ---------------------
+class _FakeResponse:
+    def __init__(self, data):
+        self._data = data
+
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return self._data
+
+
+def test_yc_selects_small_active_hiring_remote_first():
+    from src.sourcing.yc_directory import select_companies
+
+    base = {"status": "Active", "isHiring": True, "stage": "Early", "regions": [], "launched_at": 1}
+    companies = [
+        {**base, "name": "Old", "website": "https://old.dev", "team_size": 5, "launched_at": 100},
+        {**base, "name": "New", "website": "https://new.dev", "team_size": 5, "launched_at": 900},
+        {**base, "name": "Remote", "website": "https://remote.dev", "team_size": 5, "regions": ["Fully Remote"]},
+        {**base, "name": "Big", "website": "https://big.dev", "team_size": 400},
+        {**base, "name": "Gone", "website": "https://gone.dev", "team_size": 3, "status": "Inactive"},
+        {**base, "name": "NoSite", "website": "", "team_size": 3},
+        {**base, "name": "Unknown", "website": "https://unknown.dev", "team_size": None, "stage": "Growth"},
+    ]
+    picked = [c["name"] for c in select_companies(companies, max_team_size=25)]
+    assert picked == ["Remote", "New", "Old"]
+
+
+def test_yc_provider_yields_leads_and_tolerates_outages():
+    import httpx
+    from src.sourcing.yc_directory import YCDirectoryProvider
+
+    data = [{"name": "Acme", "website": "https://acme.dev", "status": "Active", "isHiring": True,
+             "team_size": 4, "batch": "Fall 2026", "one_liner": "Agents for X"}]
+    client = type("C", (), {"get": lambda self, url: _FakeResponse(data)})()
+    leads = YCDirectoryProvider(Settings(), client=client).fetch(5)
+    assert [(l.url, l.source, l.name_hint) for l in leads] == [("https://acme.dev", "yc", "Acme")]
+    assert "Fall 2026" in leads[0].context
+
+    def boom(self, url):
+        raise httpx.ConnectError("offline")
+    down = type("C", (), {"get": boom})()
+    assert YCDirectoryProvider(Settings(), client=down).fetch(5) == []
+
+
+def test_launch_hn_uses_company_links_only():
+    from src.sourcing.launch_hn import LaunchHNProvider, parse_launch
+
+    good = {"title": "Launch HN: Alter (YC S25) – Access control for agents", "url": "https://alterauth.com/"}
+    lead = parse_launch(good)
+    assert lead.url == "https://alterauth.com/" and lead.name_hint == "Alter" and lead.source == "launchhn"
+    assert parse_launch({"title": "Launch HN: Repo (YC W24) – thing", "url": "https://github.com/x/y"}) is None
+    assert parse_launch({"title": "Launch HN: Text (YC F26) – no link", "url": None}) is None
+
+    pages = {0: {"hits": [good, good], "nbPages": 1}}
+    client = type("C", (), {"get": lambda self, url, params: _FakeResponse(pages[params["page"]])})()
+    assert [l.url for l in LaunchHNProvider(Settings(), client=client).fetch(10)] == ["https://alterauth.com/"]
+
+
+def test_run_mixes_sources_and_skips_repeats(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    import src.pipeline as pipeline
+    from src.sourcing.base import BaseSourcingProvider, Lead
+
+    def source(name, urls):
+        class P(BaseSourcingProvider):
+            def iter_leads(self):
+                return (Lead(url=u, source=name) for u in urls)
+        P.name = name
+        return P()
+
+    providers = [source("yc", ["https://a.dev", "https://b.dev"]), source("hn", ["https://a.dev", "https://c.dev"])]
+    monkeypatch.setattr(pipeline, "build_providers", lambda settings, src: providers)
+    pipe = pipeline.Pipeline.__new__(pipeline.Pipeline)
+    pipe.settings, pipe.db, pipe.dry_run = Settings(), Database(tmp_path / "t.db"), True
+    processed = []
+    pipe.process = lambda url, src, hint=None, force=False: processed.append((src, url)) or pipeline.Result(
+        domain_of(url), "skipped", "x")
+
+    pipe.run(limit=5)
+    # turns alternate yc, hn, yc, hn; the second a.dev (from hn) is skipped as a repeat
+    assert processed == [("yc", "https://a.dev"), ("yc", "https://b.dev"), ("hn", "https://c.dev")]

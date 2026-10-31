@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     http_timeout: float = 15.0
     user_agent: str = DEFAULT_USER_AGENT
     hn_lookback_days: int = 62
+    launchhn_lookback_days: int = 120
+    yc_max_team_size: int = 25  # YC directory: skip companies larger than this
     log_level: str = "INFO"
     headless: bool = False  # set on servers/CI: never open a browser for Gmail sign-in
 

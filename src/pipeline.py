@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Iterator, Optional
 
 from src.config import Settings
 from src.db import Database
@@ -16,7 +16,9 @@ from src.outreach.gmail_client import GmailDraftClient, GmailError
 from src.profile import load_profile
 from src.sourcing.base import BaseSourcingProvider, Lead
 from src.sourcing.hacker_news import HackerNewsProvider
+from src.sourcing.launch_hn import LaunchHNProvider
 from src.sourcing.product_hunt import ProductHuntProvider
+from src.sourcing.yc_directory import YCDirectoryProvider
 from src.utils import domain_of, normalize_url
 
 log = logging.getLogger(__name__)
@@ -36,6 +38,8 @@ class Result:
 
 def build_providers(settings: Settings, names: str = "all") -> list[BaseSourcingProvider]:
     available: dict[str, Callable[[Settings], BaseSourcingProvider]] = {
+        "yc": YCDirectoryProvider,
+        "launchhn": LaunchHNProvider,
         "hn": HackerNewsProvider,
         "producthunt": ProductHuntProvider,
     }
@@ -44,6 +48,18 @@ def build_providers(settings: Settings, names: str = "all") -> list[BaseSourcing
     if names not in available:
         raise ValueError(f"Unknown source {names!r}; choose from: all, {', '.join(available)}")
     return [available[names](settings)]
+
+
+def interleave(streams: list[Iterator[Lead]]) -> Iterator[Lead]:
+    """Take one lead from each source in turn, so a single run draws on all of them."""
+    active = list(streams)
+    while active:
+        for stream in list(active):
+            lead = next(stream, None)
+            if lead is None:
+                active.remove(stream)
+            else:
+                yield lead
 
 
 class Pipeline:
@@ -145,14 +161,16 @@ class Pipeline:
                 return results
             handle(row["url"], row["source"], None)
 
-        for provider in build_providers(self.settings, source):
-            for lead in provider.iter_leads():
-                if drafted >= limit or attempts >= max_attempts:
-                    return results
-                try:
-                    if self.db.is_known(domain_of(lead.url)):
-                        continue
-                except ValueError:
-                    continue
-                handle(lead.url, lead.source, lead.name_hint)
+        seen: set[str] = set()  # dry runs record nothing, so also dedupe within this run
+        for lead in interleave([p.iter_leads() for p in build_providers(self.settings, source)]):
+            if drafted >= limit or attempts >= max_attempts:
+                return results
+            try:
+                domain = domain_of(lead.url)
+            except ValueError:
+                continue
+            if domain in seen or self.db.is_known(domain):
+                continue
+            seen.add(domain)
+            handle(lead.url, lead.source, lead.name_hint)
         return results
