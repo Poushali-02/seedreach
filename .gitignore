@@ -11,3 +11,6 @@ profile.json
 
 # demo videos are attached to releases, not committed
 docs/*.mp4
+
+# eval dataset: real founder names and pages, kept out of the public repo
+evals/data/

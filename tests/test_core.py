@@ -330,3 +330,90 @@ def test_cli_starts_and_lists_commands():
     assert result.exit_code == 0, result.output
     for command in ("run", "target", "add-target", "status"):
         assert command in result.output
+
+
+# ---- evals ---------------------------------------------------------------
+def test_eval_snapshot_saves_pages_once_and_keeps_corrections(tmp_path: Path):
+    from evals import snapshot as snap
+    from src.intelligence.scraper import ScrapedPage
+
+    class FakeScraper:
+        calls = 0
+
+        def fetch(self, url):
+            FakeScraper.calls += 1
+            return ScrapedPage(url=url, domain=domain_of(url), text="Shiplog by Ada.", mailtos=["ada@useshiplog.com"])
+
+    class FakeExtractor:
+        def extract(self, page, hint):
+            return _company("DevTools")
+
+    companies = [{"url": "https://useshiplog.com", "source": "hacker_news", "case": "normal", "name_hint": "Shiplog"}]
+    rows = snap.run(companies, FakeScraper(), FakeExtractor(), tmp_path, echo=None)
+    assert rows[0]["company_name"] == "Shiplog" and rows[0]["founder_first_name"] == "Ada"
+    assert rows[0]["emails_on_site"] == "ada@useshiplog.com" and rows[0]["checked"] == ""
+
+    # a human corrects the row; a second run reuses the saved page and keeps the correction
+    rows[0].update(core_domain="B2B SaaS", checked="yes")
+    snap.write_csv(tmp_path / "labels.csv", rows)
+    again = snap.run(companies, FakeScraper(), FakeExtractor(), tmp_path, echo=None)
+    assert FakeScraper.calls == 1
+    assert again[0]["core_domain"] == "B2B SaaS" and again[0]["checked"] == "yes"
+
+
+def test_eval_snapshot_records_failures_and_retries_them(tmp_path: Path):
+    from evals import snapshot as snap
+    from src.intelligence.extractor import ExtractionError
+    from src.intelligence.scraper import ScrapedPage
+
+    class Scraper:
+        def fetch(self, url):
+            return ScrapedPage(url=url, domain=domain_of(url), text="Shiplog.")
+
+    class FlakyExtractor:
+        def __init__(self, fail):
+            self.fail = fail
+
+        def extract(self, page, hint):
+            if self.fail:
+                raise ExtractionError("Gemini API error: 503")
+            return _company("DevTools")
+
+    companies = [{"url": "https://useshiplog.com"}]
+    first = snap.run(companies, Scraper(), FlakyExtractor(fail=True), tmp_path, echo=None)
+    assert first[0]["company_name"] == "" and "503" in first[0]["notes"]
+    second = snap.run(companies, Scraper(), FlakyExtractor(fail=False), tmp_path, echo=None)
+    assert second[0]["company_name"] == "Shiplog" and second[0]["notes"] == ""
+
+
+def test_eval_scoring_rules():
+    from evals.run_evals import domain_ok, founder_outcome, hook_rule_problems, norm_name
+
+    assert norm_name("Revieve Oy") == norm_name("revieve") and norm_name("Toolhouse AI") != norm_name("Toolhouse")
+    assert domain_ok("DevTools|AI Agents", "AI Agents") and not domain_ok("Other", "B2B SaaS")
+    assert founder_outcome(("", ""), (None, None)) == "correct"
+    assert founder_outcome(("", ""), ("Quinn", "Slack")) == "invented"
+    assert founder_outcome(("Derek", "Gregg"), ("Derek", None)) == "partial"
+    assert founder_outcome(("René", "Fergen"), (None, None)) == "missed"
+    assert founder_outcome(("Jacob", "Shen"), ("Kenny", "Stone")) == "wrong_person"
+    assert hook_rule_problems("I noticed X. I was curious how Y.") == ["more than one sentence"]
+    assert hook_rule_problems("I was curious how Shiplog v2.1 diffs notes.") == []
+
+
+def test_eval_score_saved_counts_wrong_websites_as_unsendable(tmp_path: Path):
+    import json
+
+    from evals.run_evals import score_saved, summarize
+
+    pred = _company("DevTools").model_dump()
+    labels = [
+        {"domain": "useshiplog.com", "right_website": "yes", "company_name": "Shiplog", "core_domain": "DevTools",
+         "founder_first_name": "Ada", "founder_last_name": "", "hook_ok": "yes"},
+        {"domain": "jobs.example", "right_website": "no", "company_name": "Shiplog", "core_domain": "DevTools",
+         "founder_first_name": "", "founder_last_name": "", "hook_ok": "yes"},
+    ]
+    for label in labels:
+        (tmp_path / f"{label['domain']}.json").write_text(json.dumps({"prediction": pred}), encoding="utf-8")
+    summary = summarize(score_saved(labels, tmp_path))
+    assert summary["company_name"] == 100.0 and summary["founder_correct"] == 100.0
+    assert summary["wrong_website_rows"] == 1 and summary["sendable"] == 50.0

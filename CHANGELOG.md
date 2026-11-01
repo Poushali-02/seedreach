@@ -5,6 +5,15 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+### Added
+- Evals: `python -m evals.snapshot` saves company pages and pre-fills an answer key to check by hand;
+  `python -m evals.run_evals` scores extraction against it (see `evals/README.md`). Current scores are
+  in the README under "How well it works".
+
+### Changed
+- A person counts as the founder only if the site calls them a founder or co-founder; a CEO or CTO
+  alone no longer does. More drafts now greet the team instead of a person.
+
 ## [0.2.0] - 2026-10-31
 
 More places to find startups, and a project that's ready for contributors.
