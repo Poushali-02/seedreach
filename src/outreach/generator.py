@@ -63,12 +63,20 @@ def generate_linkedin_note(company: CompanyProfile, profile: Profile) -> str:
     intro = f"I'm {profile.first_name}, {profile.intro}."
     closing = "I'd love to connect!"
     
-    # 1. Try building the full note
     note = f"{greeting}{hook} {intro} {closing}"
     
-    # 2. If it's too long, chop the whole string to 296 chars and add "..."
     if len(note) > 300:
-        note = note[:296].strip() + "..."
+        # Calculate exactly how much space is left for the hook
+        fixed_length = len(greeting) + len(intro) + len(closing) + 5 # 5 for spaces and "..."
+        allowed_hook_length = 300 - fixed_length
         
+        if allowed_hook_length > 0:
+            # Truncate at a word boundary using rsplit
+            truncated_hook = hook[:allowed_hook_length].rsplit(' ', 1)[0]
+            note = f"{greeting}{truncated_hook}... {intro} {closing}"
+        else:
+            note = f"{greeting}{intro} {closing}"
+            note = note[:297] + "..."
+            
     _assert_plain_text(note)
     return note
