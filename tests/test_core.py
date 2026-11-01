@@ -128,6 +128,45 @@ def test_scraper_extracts_text_meta_mailto_and_about_links():
     assert extra == ["https://shiplog.io/about"]
 
 
+
+def test_scraper_ranks_team_pages_first_and_skips_noise():
+    html = """<a href="/contact">Contact</a><a href="/about/careers">Careers</a><a href="/blog/2025/launch">Post</a>
+    <a href="/about">About</a><a href="/vision">Vision</a><a href="/our-team">Our Team</a>
+    <a href="/ueber-uns">Über uns</a><a href="/authors/ada">Ada, Co-founder</a><a href="https://other.dev/team">x</a>
+    <a href="/use-cases">How teams use Shiplog</a>"""
+    _, extra = _parse(html, "https://shiplog.io")
+    assert extra == [
+        "https://shiplog.io/our-team", "https://shiplog.io/ueber-uns", "https://shiplog.io/authors/ada",
+        "https://shiplog.io/about", "https://shiplog.io/vision", "https://shiplog.io/contact",
+    ]
+
+
+def test_scraper_keeps_extra_pages_when_the_first_page_is_long():
+    from src.intelligence import scraper as sc
+
+    pages = {
+        "https://shiplog.io": f"<p>{'feature ' * 4000}</p><a href='/team'>Team</a>",
+        "https://shiplog.io/team": "<p>Ada Lovelace, Co-founder and CEO.</p>",
+    }
+
+    class Client:
+        def get(self, url):
+            from types import SimpleNamespace as NS
+            return NS(text=pages[url.rstrip("/")], url=url, headers={"content-type": "text/html"},
+                      raise_for_status=lambda: None)
+
+    page = sc.Scraper(Settings(), client=Client()).fetch("https://shiplog.io")
+    assert "Ada Lovelace, Co-founder" in page.text and len(page.text) <= sc.MAX_TEXT_CHARS
+    assert page.truncated and page.pages == ["https://shiplog.io", "https://shiplog.io/team"]
+
+
+def test_scraper_excerpt_keeps_the_founder_section_of_a_long_page():
+    from src.intelligence.scraper import _excerpt
+
+    text = "product " * 1000 + "Ada Lovelace, Co-founder"
+    assert "Co-founder" in _excerpt(text, 3000) and len(_excerpt(text, 3000)) <= 3000
+    assert _excerpt("Founder Ada. " + "x" * 5000, 3000).startswith("Founder Ada")
+
 def test_hn_comment_parsing():
     good = ('Acme | Backend Python Intern | REMOTE | https://acme.dev<p>We build agents. '
             '<a href="https://acme.dev/jobs">jobs</a> <a href="https://jobs.lever.co/acme">lever</a>')
@@ -396,6 +435,8 @@ def test_eval_scoring_rules():
     assert founder_outcome(("Derek", "Gregg"), ("Derek", None)) == "partial"
     assert founder_outcome(("René", "Fergen"), (None, None)) == "missed"
     assert founder_outcome(("Jacob", "Shen"), ("Kenny", "Stone")) == "wrong_person"
+    assert founder_outcome(("Jacob", "Shen"), ("Kenny", "Stone"), "Kenny Stone") == "correct"
+    assert founder_outcome(("Naftali", ""), ("Max", None), "Sam Bobb; Max") == "correct"
     assert hook_rule_problems("I noticed X. I was curious how Y.") == ["more than one sentence"]
     assert hook_rule_problems("I was curious how Shiplog v2.1 diffs notes.") == []
 

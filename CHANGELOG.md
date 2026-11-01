@@ -8,7 +8,9 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 ### Added
 - Evals: `python -m evals.snapshot` saves company pages and pre-fills an answer key to check by hand;
   `python -m evals.run_evals` scores extraction against it (see `evals/README.md`). Current scores are
-  in the README under "How well it works".
+  in the README under "How well it works". The answer key's `other_founders` column lists every other
+  founder a site names (naming any of them counts as correct), and `--pages` scores another set of saved
+  pages, for before/after comparisons.
 - Run traces: every real run records, per company, the time each step took, LLM tokens and retries,
   pages read, whether the text was cut at the length limit, and whether a named founder appears on
   the page. `run` prints a summary at the end; `status` shows recent runs. Set
@@ -17,6 +19,13 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 ### Changed
 - A person counts as the founder only if the site calls them a founder or co-founder; a CEO or CTO
   alone no longer does. More drafts now greet the team instead of a person.
+- The scraper finds founders more often:
+  - It ranks same-site links by how likely they are to name the founders: team, founders,
+    leadership, "about us", "Über uns" first, then about/company/vision, then contact.
+  - It matches whole words, so "how teams use X" no longer counts as a team page.
+  - It skips careers, blog, press and legal pages, and reads up to 3 extra pages instead of 2.
+  - Each extra page keeps its own 3,000 characters, starting at the first mention of a founder, so a
+    long homepage can't push the team page out. The total limit is now 16,000 characters (was 12,000).
 
 ## [0.2.0] - 2026-10-31
 

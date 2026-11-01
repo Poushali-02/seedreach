@@ -46,14 +46,22 @@ def domain_ok(truth: str, pred: Optional[str]) -> bool:
     return (pred or "") in {d.strip() for d in truth.split("|")}
 
 
-def founder_outcome(truth: tuple[str, str], pred: tuple[Optional[str], Optional[str]]) -> str:
-    """correct | partial (right first name only) | missed | invented | wrong_person."""
+def founder_outcome(truth: tuple[str, str], pred: tuple[Optional[str], Optional[str]],
+                    others: str = "") -> str:
+    """correct | partial (right first name only) | missed | invented | wrong_person.
+
+    `others` lists the site's other founders ("Sam Bobb; Max"): naming any of them is also correct.
+    """
     t_first, t_last = (norm_name(x) for x in truth)
     p_first, p_last = (norm_name(x) for x in pred)
     if not t_first:
         return "correct" if not p_first else "invented"
     if not p_first:
         return "missed"
+    for other in filter(None, (o.strip() for o in others.split(";"))):
+        o_first, _, o_last = other.partition(" ")
+        if p_first == norm_name(o_first) and p_last == norm_name(o_last):
+            return "correct"
     if p_first != t_first:
         return "wrong_person"
     return "correct" if p_last == t_last else "partial"
@@ -85,6 +93,7 @@ def score_row(label: dict[str, str], pred: Optional[dict[str, Any]], hook_ok: Op
         "founder": founder_outcome(
             (label.get("founder_first_name", ""), label.get("founder_last_name", "")),
             (pred.get("founder_first_name"), pred.get("founder_last_name")),
+            label.get("other_founders", ""),
         ),
         "hook_rule_problems": hook_rule_problems(pred.get("personalized_hook", "")),
         "hook_ok": hook_ok,
@@ -131,8 +140,11 @@ def score_saved(labels: list[dict[str, str]], pages_dir: Path) -> list[dict[str,
     results = []
     for label in labels:
         snap = json.loads((pages_dir / f"{label['domain']}.json").read_text(encoding="utf-8"))
-        verdict = label.get("hook_ok", "").lower()
-        results.append(score_row(label, snap.get("prediction"), {"yes": True, "no": False}.get(verdict)))
+        pred = snap.get("prediction")
+        # the verdict is about the hook the human read; a re-scraped page has a new one
+        same_hook = pred is not None and pred.get("personalized_hook") == label.get("model_hook")
+        verdict = label.get("hook_ok", "").lower() if same_hook else ""
+        results.append(score_row(label, pred, {"yes": True, "no": False}.get(verdict)))
     return results
 
 
@@ -186,6 +198,7 @@ def print_report(summary: dict[str, Any], title: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--labels", type=Path, default=DATA / "labels.csv")
+    parser.add_argument("--pages", type=Path, default=DATA / "pages", help="saved pages to score against")
     parser.add_argument("--live", action="store_true", help="re-run the extractor instead of using saved answers")
     parser.add_argument("-n", "--repeats", type=int, default=3, help="runs per page with --live")
     args = parser.parse_args()
@@ -197,7 +210,7 @@ def main() -> None:
         settings = get_settings()
         out["model"] = settings.gemini_model if settings.llm_provider == "gemini" else settings.anthropic_model
         hints = {domain_of(r["url"]): r.get("name_hint") or None for r in read_csv(DATA / "companies.csv")}
-        runs = score_live(labels, DATA / "pages", Extractor(settings), args.repeats, hints)
+        runs = score_live(labels, args.pages, Extractor(settings), args.repeats, hints)
         out["runs"] = [summarize(r) for r in runs]
         out["stability"] = stability(runs)
         for i, summary in enumerate(out["runs"], 1):
@@ -205,7 +218,7 @@ def main() -> None:
         print(f"\nSame domain and founder verdict in every run: {out['stability']['stable']}%"
               f"  unstable: {', '.join(out['stability']['unstable_rows']) or 'none'}")
     else:
-        results = score_saved(labels, DATA / "pages")
+        results = score_saved(labels, args.pages)
         out["summary"], out["rows"] = summarize(results), results
         print_report(out["summary"], "Saved answers (the ones you checked)")
 

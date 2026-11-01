@@ -26,7 +26,8 @@ from src.utils import domain_of
 DATA = ROOT / "evals" / "data"
 LABEL_FIELDS = (
     "domain", "url", "source", "case", "checked", "right_website", "company_name", "core_domain",
-    "founder_first_name", "founder_last_name", "emails_on_site", "model_hook", "hook_ok", "notes",
+    "founder_first_name", "founder_last_name", "other_founders", "emails_on_site", "model_hook", "hook_ok",
+    "notes",
 )
 
 
@@ -81,6 +82,7 @@ def label_row(row: dict[str, str], snap: dict[str, Any]) -> dict[str, str]:
         "core_domain": pred.get("core_domain", ""),
         "founder_first_name": pred.get("founder_first_name") or "",
         "founder_last_name": pred.get("founder_last_name") or "",
+        "other_founders": "",
         "emails_on_site": " ".join(page.get("mailtos", [])),
         "model_hook": pred.get("personalized_hook", ""),
         "hook_ok": "",

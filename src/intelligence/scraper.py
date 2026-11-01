@@ -16,10 +16,26 @@ from src.utils import domain_of, normalize_url, registered_domain
 
 log = logging.getLogger(__name__)
 
-MAX_TEXT_CHARS = 12_000
-MAX_EXTRA_PAGES = 2
+MAX_TEXT_CHARS = 16_000
+MAX_EXTRA_PAGES = 3
+EXTRA_PAGE_CHARS = 3_000  # each extra page keeps this much, so a long first page can't push it out
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-_ABOUT_HINT = re.compile(r"/(about|team|company|founders?|people|contact)(/|$|\?)", re.I)
+# Same-site pages likely to name the founders, best first, matched on the link's path and text.
+# Contact pages rarely name anyone but often list an email, so they still get a slot when one is free.
+_LINK_TIERS = tuple(re.compile(rf"\b({words})\b", re.I) for words in (  # whole words: "teams" is not "team"
+    r"founders?|co-?founders?|team|people|leadership|who[- ]we[- ]are|über uns|ueber-uns|uber-uns|about[- ]us|our[- ]story",
+    r"about|company|story|vision|mission",
+    r"contact",
+))
+_SKIP_LINK = re.compile(r"career|jobs|blog/|news|press|privacy|terms|legal", re.I)
+_FOUNDER_WORD = re.compile(r"co-?founder|founder|gründer", re.I)
+
+
+def _excerpt(text: str, limit: int) -> str:
+    """Up to `limit` characters, starting a little before the first mention of a founder if it's further in."""
+    match = _FOUNDER_WORD.search(text)
+    start = 0 if match is None or match.end() <= limit else max(0, match.start() - limit // 3)
+    return text[start:start + limit]
 _NOISE_TAGS = ("script", "style", "noscript", "svg", "iframe", "form", "template")
 _FILE_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".css", ".js")
 
@@ -68,15 +84,23 @@ def _parse(html: str, url: str) -> tuple[ScrapedPage, list[str]]:
         a["href"][7:].split("?")[0] for a in soup.find_all("a", href=True)
         if a["href"].lower().startswith("mailto:")
     ]
-    # candidate about/team links, same site only
+    # candidate team/about links, same site only, ranked by how likely they are to name the founders
     host = registered_domain(urlparse(url).hostname or "")
-    extra_links: list[str] = []
+    ranked: dict[str, int] = {}
     for a in soup.find_all("a", href=True):
         target = urljoin(url, a["href"]).split("#")[0]
         t = urlparse(target)
-        if t.scheme in ("http", "https") and registered_domain(t.hostname or "") == host \
-                and _ABOUT_HINT.search(t.path + "/") and target not in extra_links and target != url:
-            extra_links.append(target)
+        if t.scheme not in ("http", "https") or registered_domain(t.hostname or "") != host:
+            continue
+        if target.rstrip("/") == url.rstrip("/") or len([s for s in t.path.split("/") if s]) > 2:
+            continue  # the page itself, or a deep page such as a blog post
+        if _SKIP_LINK.search(t.path):
+            continue
+        label = f"{t.path} {a.get_text(' ', strip=True)}"
+        tier = next((i for i, rx in enumerate(_LINK_TIERS) if rx.search(label)), None)
+        if tier is not None and tier < ranked.get(target, len(_LINK_TIERS)):
+            ranked[target] = tier
+    extra_links = sorted(ranked, key=ranked.__getitem__)  # stable: page order within a tier
 
     for tag in soup(_NOISE_TAGS):
         tag.decompose()
@@ -122,6 +146,7 @@ class Scraper:
         page, extra_links = _parse(html, final_url)
         page.pages = [final_url]
 
+        extras: list[str] = []
         for link in extra_links[:MAX_EXTRA_PAGES]:
             try:
                 sub_html, sub_url = self._get_html(link)
@@ -129,12 +154,15 @@ class Scraper:
                 log.debug("skipping extra page: %s", exc)
                 continue
             sub, _ = _parse(sub_html, sub_url)
-            page.text += f"\n\n--- {sub_url} ---\n{sub.text}"
+            page.truncated |= len(sub.text) > EXTRA_PAGE_CHARS
+            extras.append(f"\n\n--- {sub_url} ---\n{_excerpt(sub.text, EXTRA_PAGE_CHARS)}")
             page.mailtos = _extract_emails(page.mailtos + sub.mailtos)
             page.pages.append(sub_url)
 
-        page.truncated = len(page.text) > MAX_TEXT_CHARS
-        page.text = page.text[:MAX_TEXT_CHARS]
+        # the first page gets what the extra pages leave, so the team page always reaches the model
+        budget = MAX_TEXT_CHARS - sum(len(e) for e in extras)
+        page.truncated |= len(page.text) > budget
+        page.text = page.text[:budget] + "".join(extras)
         if len(page.text) < 80 and not page.meta:
             raise ScrapeError(f"{url} has too little readable text (JS-only site?)")
         return page
