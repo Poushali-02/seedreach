@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from dataclasses import dataclass
 from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ValidationError, field_validator
@@ -70,6 +71,19 @@ class ExtractionError(Exception):
     """The LLM call failed or returned data that does not match the schema."""
 
 
+@dataclass
+class Usage:
+    """Token counts for the latest extract() call, summed over its retries."""
+    calls: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    def add(self, input_tokens: Optional[int], *output_tokens: Optional[int]) -> None:
+        self.calls += 1
+        self.input_tokens += input_tokens or 0
+        self.output_tokens += sum(t or 0 for t in output_tokens)
+
+
 class Extractor:
     def __init__(self, settings: Settings, client: Optional[Any] = None) -> None:
         self.provider = settings.llm_provider
@@ -84,6 +98,7 @@ class Extractor:
                 raise ExtractionError(f"{key_name} is not set (LLM_PROVIDER={self.provider}; see .env.example)")
             client = self._build_client(key)
         self.client = client
+        self.usage = Usage()
 
     def _build_client(self, key: str) -> Any:
         if self.provider == "gemini":
@@ -118,6 +133,9 @@ class Extractor:
                     raise ExtractionError(f"Gemini API error: {exc}") from exc
                 log.warning("Gemini busy (%s); retrying in %ss", exc.code, delay)
                 time.sleep(delay)
+        meta = getattr(resp, "usage_metadata", None)  # "thinking" tokens are billed as output
+        self.usage.add(*(getattr(meta, f, 0) for f in (
+            "prompt_token_count", "candidates_token_count", "thoughts_token_count")))
         if not resp.text:
             raise ValueError("Gemini returned no text (blocked or empty response)")
         return json.loads(resp.text)
@@ -138,6 +156,8 @@ class Extractor:
             )
         except anthropic.APIError as exc:
             raise ExtractionError(f"Anthropic API error: {exc}") from exc
+        usage = getattr(resp, "usage", None)
+        self.usage.add(getattr(usage, "input_tokens", 0), getattr(usage, "output_tokens", 0))
         block = next((b for b in resp.content if b.type == "tool_use"), None)
         if block is None:
             raise ValueError("model returned no tool call")
@@ -149,6 +169,7 @@ class Extractor:
             user += f"(Name hint from the source listing: {name_hint})\n"
         user += f"\n<website>\n{page.as_prompt_text()}\n</website>"
         call = self._call_gemini if self.provider == "gemini" else self._call_anthropic
+        self.usage = Usage()
 
         last_error: Optional[Exception] = None
         for attempt in range(2):  # one retry if the model returns unparseable / schema-invalid data

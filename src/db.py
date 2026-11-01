@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator, Optional
 
+from src.trace import Trace
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS companies (
     domain        TEXT PRIMARY KEY,
@@ -32,6 +34,29 @@ CREATE TABLE IF NOT EXISTS events (
     domain  TEXT,
     message TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS traces (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id          TEXT NOT NULL,
+    ts              TEXT NOT NULL,
+    domain          TEXT NOT NULL,
+    source          TEXT NOT NULL,
+    outcome         TEXT NOT NULL,
+    detail          TEXT,
+    pages           INTEGER,
+    text_chars      INTEGER,
+    truncated       INTEGER,
+    model           TEXT,
+    llm_calls       INTEGER,
+    input_tokens    INTEGER,
+    output_tokens   INTEGER,
+    founder_in_text INTEGER,
+    email_source    TEXT,
+    scrape_ms       INTEGER,
+    extract_ms      INTEGER,
+    email_ms        INTEGER,
+    draft_ms        INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_traces_run ON traces (run_id);
 """
 
 
@@ -134,7 +159,37 @@ class Database:
                 (_now(), level.upper(), domain, message),
             )
 
+    def record_trace(self, run_id: str, t: Trace) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT INTO traces (run_id, ts, domain, source, outcome, detail, pages, text_chars, truncated, "
+                "model, llm_calls, input_tokens, output_tokens, founder_in_text, email_source, "
+                "scrape_ms, extract_ms, email_ms, draft_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (run_id, _now(), t.domain, t.source, t.outcome, t.detail, t.pages, t.text_chars, t.truncated,
+                 t.model, t.llm_calls, t.input_tokens, t.output_tokens, t.founder_in_text, t.email_source,
+                 t.ms.get("scrape"), t.ms.get("extract"), t.ms.get("email"), t.ms.get("draft")),
+            )
+
     # ---- reads ---------------------------------------------------------
+    def recent_runs(self, limit: int = 5) -> list[sqlite3.Row]:
+        """One summary row per run, newest first."""
+        with self._conn() as conn:
+            return conn.execute(
+                """
+                SELECT run_id, COUNT(*) AS companies,
+                       SUM(outcome = 'drafted') AS drafted, SUM(outcome = 'skipped') AS skipped,
+                       SUM(outcome = 'error') AS errors,
+                       COALESCE(SUM(input_tokens), 0) AS input_tokens,
+                       COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                       COALESCE(SUM(truncated), 0) AS truncated,
+                       COALESCE(SUM(founder_in_text = 0), 0) AS founder_not_in_text,
+                       AVG(COALESCE(scrape_ms, 0) + COALESCE(extract_ms, 0) + COALESCE(email_ms, 0)
+                           + COALESCE(draft_ms, 0)) AS avg_ms
+                FROM traces GROUP BY run_id ORDER BY MAX(id) DESC LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+
     def pending_queue(self, limit: int) -> list[sqlite3.Row]:
         with self._conn() as conn:
             return conn.execute(

@@ -417,3 +417,75 @@ def test_eval_score_saved_counts_wrong_websites_as_unsendable(tmp_path: Path):
     summary = summarize(score_saved(labels, tmp_path))
     assert summary["company_name"] == 100.0 and summary["founder_correct"] == 100.0
     assert summary["wrong_website_rows"] == 1 and summary["sendable"] == 50.0
+
+
+# ---- run traces -----------------------------------------------------------
+def test_extractor_counts_tokens_across_retries():
+    import json
+    from types import SimpleNamespace as NS
+    from src.intelligence.extractor import Extractor
+
+    usage = NS(prompt_token_count=1000, candidates_token_count=50, thoughts_token_count=None)
+    replies = iter([NS(text="not json", usage_metadata=usage), NS(text=json.dumps(GOOD), usage_metadata=usage)])
+    client = NS(models=NS(generate_content=lambda **kw: next(replies)))
+    ex = Extractor(Settings(llm_provider="gemini"), client=client)
+    ex.extract(_page())
+    assert (ex.usage.calls, ex.usage.input_tokens, ex.usage.output_tokens) == (2, 2000, 100)
+
+
+def _traced_pipeline(tmp_path: Path, founder_text: str):
+    from types import SimpleNamespace as NS
+    import src.pipeline as pipeline
+    from src.enrichment.email_finder import EmailResult
+    from src.intelligence.extractor import Usage
+    from src.intelligence.scraper import ScrapedPage
+
+    class FakeExtractor:
+        model, usage = "fake-model", Usage()
+
+        def extract(self, page, hint):
+            self.usage = Usage(calls=1, input_tokens=900, output_tokens=40)
+            return _company("DevTools")
+
+    pipe = pipeline.Pipeline.__new__(pipeline.Pipeline)
+    pipe.settings, pipe.db, pipe.dry_run = Settings(), Database(tmp_path / "t.db"), False
+    pipe.run_id, pipe.traces, pipe.profile = "run-1", [], PROFILE
+    pipe.scraper = NS(fetch=lambda url: ScrapedPage(
+        url=url, domain="useshiplog.com", text=founder_text, pages=[url, url + "/about"], truncated=True))
+    pipe.extractor = FakeExtractor()
+    pipe.finder = NS(find=lambda *a: EmailResult("ada@useshiplog.com", "heuristic", "guess"))
+    pipe.gmail = NS(create_draft=lambda *a: "draft-1")
+    return pipe
+
+
+def test_pipeline_records_a_trace_per_company(tmp_path: Path):
+    pipe = _traced_pipeline(tmp_path, "Shiplog was started by Ada.")  # first name only on the page
+    assert pipe.process("https://useshiplog.com", "hn").outcome == "drafted"
+    assert pipe.process("https://useshiplog.com", "hn").outcome == "duplicate"  # no second trace
+
+    (t,) = pipe.traces
+    assert (t.domain, t.outcome, t.pages, t.truncated, t.llm_calls, t.input_tokens) == (
+        "useshiplog.com", "drafted", 2, True, 1, 900)
+    assert t.founder_in_text is True and t.email_source == "heuristic (guess)"
+    assert set(t.ms) == {"scrape", "extract", "email", "draft"}
+
+    (run,) = pipe.db.recent_runs()
+    assert (run["companies"], run["drafted"], run["input_tokens"], run["truncated"]) == (1, 1, 900, 1)
+
+
+def test_trace_flags_a_founder_the_page_never_names(tmp_path: Path):
+    from src.trace import name_in_text
+
+    pipe = _traced_pipeline(tmp_path, "Changelogs for monorepos.")
+    pipe.process("https://useshiplog.com", "hn")
+    assert pipe.traces[0].founder_in_text is False
+    assert pipe.db.recent_runs()[0]["founder_not_in_text"] == 1
+    assert name_in_text("Ada", "Lovelace", "by ada lovelace,") and name_in_text(None, None, "x") is None
+    assert not name_in_text("Ada", None, "Adam built it")
+
+
+def test_dry_run_traces_stay_in_memory(tmp_path: Path):
+    pipe = _traced_pipeline(tmp_path, "Ada")
+    pipe.dry_run = True
+    pipe.process("https://useshiplog.com", "hn")
+    assert len(pipe.traces) == 1 and pipe.db.recent_runs() == []
