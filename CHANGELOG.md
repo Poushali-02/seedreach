@@ -5,6 +5,11 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-01
+
+Measured, then fixed: on 30 hand-checked startups, ready-to-send drafts went from 43% to 63–70% and
+drafts naming a made-up founder from 11% to 0–4%.
+
 ### Added
 - Evals: `python -m evals.snapshot` saves company pages and pre-fills an answer key to check by hand;
   `python -m evals.run_evals` scores extraction against it (see `evals/README.md`). Current scores are
@@ -26,6 +31,11 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   - It skips careers, blog, press and legal pages, and reads up to 3 extra pages instead of 2.
   - Each extra page keeps its own 3,000 characters, starting at the first mention of a founder, so a
     long homepage can't push the team page out. The total limit is now 16,000 characters (was 12,000).
+
+### For contributors
+- A CLI smoke test: CI fails if `main.py` can't start.
+- CONTRIBUTING and the PR template ask you to wait to be assigned before opening a PR for an issue,
+  and to paste the output of a dry run.
 
 ## [0.2.0] - 2026-10-31
 
@@ -64,6 +74,7 @@ First public release.
 - `HEADLESS` mode and a GitHub Actions template for scheduled runs from a private repo.
 - Contributing guide, security policy, issue templates and CI on Python 3.10 and 3.13.
 
-[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Poushali-02/seedreach/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Poushali-02/seedreach/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Poushali-02/seedreach/releases/tag/v0.1.0

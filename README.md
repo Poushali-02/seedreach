@@ -10,7 +10,7 @@ personalised cold email to your **Gmail Drafts**. You review it and press Send. 
 
 [Watch the full 80-second demo with sound (MP4)](https://github.com/Poushali-02/seedreach/releases/download/v0.1.0/seedreach-demo.mp4)
 
-> **Status:** early (v0.2). Built for my own internship search and maintained in my spare time.
+> **Status:** early (v0.3). Built for my own internship search and maintained in my spare time.
 > Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 A CLI that finds early-stage startups, reads their website with an LLM, finds a founder's email, and
