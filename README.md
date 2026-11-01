@@ -10,7 +10,7 @@ personalised cold email to your **Gmail Drafts**. You review it and press Send. 
 
 [Watch the full 80-second demo with sound (MP4)](https://github.com/Poushali-02/seedreach/releases/download/v0.1.0/seedreach-demo.mp4)
 
-> **Status:** early (v0.1). Built for my own internship search and maintained in my spare time.
+> **Status:** early (v0.2). Built for my own internship search and maintained in my spare time.
 > Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 A CLI that finds early-stage startups, reads their website with an LLM, finds a founder's email, and
@@ -141,7 +141,7 @@ python main.py add-target site1.com site2.io
 # One specific startup, start to finish
 python main.py target https://example-startup.com
 
-# Totals, recent companies and the event log
+# Totals, recent companies, recent runs (tokens, cost, time) and the event log
 python main.py status
 ```
 
@@ -276,7 +276,8 @@ main.py                      Typer CLI
 profile.example.json         template for your personal details
 src/config.py                Pydantic settings (.env)
 src/profile.py               loads and validates profile.json
-src/db.py                    SQLite dedupe + status + event log
+src/db.py                    SQLite dedupe + status + event log + run traces
+src/trace.py                 per-company record of each step: time, tokens, what it saw
 src/pipeline.py              orchestration
 src/sourcing/                hacker_news.py, product_hunt.py (BaseSourcingProvider)
 src/intelligence/            scraper.py, extractor.py

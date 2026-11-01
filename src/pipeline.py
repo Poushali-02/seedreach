@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Callable, Iterator, Optional
 
 from src.config import Settings
@@ -19,6 +20,7 @@ from src.sourcing.hacker_news import HackerNewsProvider
 from src.sourcing.launch_hn import LaunchHNProvider
 from src.sourcing.product_hunt import ProductHuntProvider
 from src.sourcing.yc_directory import YCDirectoryProvider
+from src.trace import Trace, name_in_text
 from src.utils import domain_of, normalize_url
 
 log = logging.getLogger(__name__)
@@ -67,6 +69,8 @@ class Pipeline:
         self.settings = settings
         self.db = db
         self.dry_run = dry_run
+        self.run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.traces: list[Trace] = []  # one per company processed, kept in memory for the run summary
         self.profile = load_profile()
         self.scraper = Scraper(settings)
         self.extractor = Extractor(settings)
@@ -88,6 +92,16 @@ class Pipeline:
         return Result(domain, "skipped", reason)
 
     def process(self, url: str, source: str, name_hint: Optional[str] = None, force: bool = False) -> Result:
+        trace = Trace(domain=url, source=source)
+        result = self._process(url, source, name_hint, force, trace)
+        if result.outcome != "duplicate":  # duplicates cost nothing and did no work
+            trace.domain, trace.outcome, trace.detail = result.domain, result.outcome, result.detail
+            self.traces.append(trace)
+            if not self.dry_run:
+                self.db.record_trace(self.run_id, trace)
+        return result
+
+    def _process(self, url: str, source: str, name_hint: Optional[str], force: bool, trace: Trace) -> Result:
         try:
             url = normalize_url(url)
         except ValueError as exc:
@@ -99,24 +113,34 @@ class Pipeline:
             return Result(domain, "duplicate", f"already {status}")
 
         try:
-            page = self.scraper.fetch(url)
+            with trace.timed("scrape"):
+                page = self.scraper.fetch(url)
         except ScrapeError as exc:
             return self._skip(domain, url, source, f"scrape failed: {exc}")
+        trace.pages, trace.text_chars, trace.truncated = len(page.pages), len(page.text), page.truncated
 
         try:
-            company = self.extractor.extract(page, name_hint)
+            with trace.timed("extract"):
+                company = self.extractor.extract(page, name_hint)
         except ExtractionError as exc:  # not recorded: an API outage must not blacklist a company
             self._record("ERROR", domain, f"extraction failed: {exc}")
             return Result(domain, "error", f"extraction failed: {exc}")
+        finally:
+            usage = self.extractor.usage
+            trace.model, trace.llm_calls = self.extractor.model, usage.calls
+            trace.input_tokens, trace.output_tokens = usage.input_tokens, usage.output_tokens
+        trace.founder_in_text = name_in_text(company.founder_first_name, company.founder_last_name, page.text)
 
         founder = " ".join(p for p in (company.founder_first_name, company.founder_last_name) if p) or None
-        email = self.finder.find(
-            page.domain, company.company_name, company.founder_first_name,
-            company.founder_last_name, page.mailtos,
-        )
+        with trace.timed("email"):
+            email = self.finder.find(
+                page.domain, company.company_name, company.founder_first_name,
+                company.founder_last_name, page.mailtos,
+            )
         if email is None:
             return self._skip(domain, url, source, "no founder email found",
                               company_name=company.company_name, founder_name=founder)
+        trace.email_source = f"{email.source} ({email.confidence})"
         if self.db.email_taken(email.email):
             return self._skip(domain, url, source, f"email {email.email} already drafted",
                               company_name=company.company_name, founder_name=founder)
@@ -126,7 +150,8 @@ class Pipeline:
             return Result(domain, "drafted", f"dry run ({email.source}: {email.confidence})", draft, email.email)
 
         try:
-            draft_id = self.gmail.create_draft(email.email, draft.subject, draft.body)
+            with trace.timed("draft"):
+                draft_id = self.gmail.create_draft(email.email, draft.subject, draft.body)
         except GmailError as exc:
             self._record("ERROR", domain, f"gmail draft failed: {exc}")
             return Result(domain, "error", f"gmail draft failed: {exc}")

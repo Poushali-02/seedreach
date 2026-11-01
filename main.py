@@ -23,6 +23,7 @@ from src.config import get_settings
 from src.db import Database
 from src.intelligence.extractor import ExtractionError
 from src.pipeline import Pipeline, Result
+from src.trace import Trace
 from src.utils import domain_of, normalize_url
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="Cold-outreach drafts for early-stage startups.")
@@ -68,6 +69,32 @@ def _summary(results: list[Result], dry_run: bool) -> dict[str, int]:
     return counts
 
 
+def _cost(input_tokens: int, output_tokens: int) -> str:
+    s = get_settings()
+    if not (s.llm_price_input_per_m or s.llm_price_output_per_m):
+        return "-"  # prices not set (free tier, or not configured)
+    return f"${(input_tokens * s.llm_price_input_per_m + output_tokens * s.llm_price_output_per_m) / 1e6:.4f}"
+
+
+def _run_stats(traces: list[Trace]) -> None:
+    """Where the time and tokens went, and what may need a look."""
+    if not traces:
+        return
+    tokens_in, tokens_out = sum(t.input_tokens for t in traces), sum(t.output_tokens for t in traces)
+    seconds = sum(sum(t.ms.values()) for t in traces) / 1000
+    console.print(
+        f"[dim]{len(traces)} companies in {seconds:.0f}s ({seconds / len(traces):.1f}s each), "
+        f"{tokens_in:,} tokens in / {tokens_out:,} out, cost {_cost(tokens_in, tokens_out)}[/dim]"
+    )
+    cut = [t.domain for t in traces if t.truncated]
+    unseen = [t.domain for t in traces if t.founder_in_text is False]
+    retried = [t.domain for t in traces if t.llm_calls > 1]
+    for label, domains in (("text cut at the length limit", cut), ("founder name not on the page", unseen),
+                           ("LLM output retried", retried)):
+        if domains:
+            console.print(f"[dim]  {label}: {', '.join(domains)}[/dim]")
+
+
 @app.command()
 def run(
     limit: int = typer.Option(5, "--limit", "-n", min=1, help="Stop after this many drafts."),
@@ -82,6 +109,7 @@ def run(
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(2)
     counts = _summary(results, dry_run)
+    _run_stats(pipe.traces)
     if counts["error"] and not counts["drafted"]:
         raise typer.Exit(1)  # every attempt failed (LLM or Gmail outage): let schedulers flag the run
 
@@ -133,6 +161,20 @@ def status(events: int = typer.Option(10, "--events", "-e", help="How many recen
             table.add_column(col)
         for r in recent:
             table.add_row(r["domain"], r["status"], r["founder_email"] or "-", r["email_source"] or "-", r["reason"] or "")
+        console.print(table)
+    runs = db.recent_runs(5)
+    if runs:
+        table = Table(title="Recent runs", caption="Done: drafted/skipped/errors. Tokens: in/out. "
+                      "Cut: text past the length limit. Off-page: founder named but not on the site.")
+        for col in ("Run (UTC)", "Done", "Tokens", "Cost", "Avg", "Cut", "Off-page"):
+            table.add_column(col)
+        for r in runs:
+            table.add_row(
+                r["run_id"][5:16].replace("T", " "), f"{r['drafted']}/{r['skipped']}/{r['errors']}",
+                f"{r['input_tokens'] / 1000:.1f}k/{r['output_tokens'] / 1000:.1f}k",
+                _cost(r["input_tokens"], r["output_tokens"]), f"{(r['avg_ms'] or 0) / 1000:.1f}s",
+                str(r["truncated"]), str(r["founder_not_in_text"]),
+            )
         console.print(table)
     log_rows = db.recent_events(events)
     if log_rows:

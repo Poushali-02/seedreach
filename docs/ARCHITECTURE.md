@@ -52,7 +52,8 @@ python main.py run --limit 5
 | `main.py` | Typer CLI: `run`, `target`, `add-target`, `status` |
 | `src/config.py` | Settings from `.env` (Pydantic `BaseSettings`) |
 | `src/profile.py` | Loads and validates `profile.json` (your details) |
-| `src/db.py` | SQLite: companies, statuses, event log, dedupe |
+| `src/db.py` | SQLite: companies, statuses, event log, dedupe, run traces |
+| `src/trace.py` | `Trace`: one company's run, step by step (time, tokens, pages read, text cut, founder on the page) |
 | `src/pipeline.py` | Orchestration, source registry (`build_providers`), `interleave` |
 | `src/sourcing/` | Lead sources: one module per source |
 | `src/intelligence/` | `scraper.py` (HTML to text) and `extractor.py` (LLM to `CompanyProfile`) |

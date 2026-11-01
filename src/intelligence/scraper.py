@@ -36,6 +36,8 @@ class ScrapedPage:
     meta: dict[str, str] = field(default_factory=dict)
     text: str = ""
     mailtos: list[str] = field(default_factory=list)
+    pages: list[str] = field(default_factory=list)  # every URL whose text is included
+    truncated: bool = False  # text was cut to MAX_TEXT_CHARS
 
     def as_prompt_text(self) -> str:
         meta = "\n".join(f"{k}: {v}" for k, v in self.meta.items() if v)
@@ -118,6 +120,7 @@ class Scraper:
         url = normalize_url(url)
         html, final_url = self._get_html(url)
         page, extra_links = _parse(html, final_url)
+        page.pages = [final_url]
 
         for link in extra_links[:MAX_EXTRA_PAGES]:
             try:
@@ -128,7 +131,9 @@ class Scraper:
             sub, _ = _parse(sub_html, sub_url)
             page.text += f"\n\n--- {sub_url} ---\n{sub.text}"
             page.mailtos = _extract_emails(page.mailtos + sub.mailtos)
+            page.pages.append(sub_url)
 
+        page.truncated = len(page.text) > MAX_TEXT_CHARS
         page.text = page.text[:MAX_TEXT_CHARS]
         if len(page.text) < 80 and not page.meta:
             raise ScrapeError(f"{url} has too little readable text (JS-only site?)")

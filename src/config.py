@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-haiku-5-5"
     apollo_api_key: str = ""
+    # USD per million tokens, from your provider's pricing page; 0 shows tokens only (e.g. on a free tier)
+    llm_price_input_per_m: float = 0.0
+    llm_price_output_per_m: float = 0.0
 
     google_credentials_file: Path = Path("credentials.json")
     google_token_file: Path = Path("token.json")
