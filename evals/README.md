@@ -41,6 +41,7 @@ answer; visit the site and fix what's wrong:
 | `company_name` | The company's name |
 | `core_domain` | `DevTools`, `AI Agents`, `Fintech`, `B2B SaaS` or `Other`. Two allowed if both fit: `DevTools\|AI Agents` |
 | `founder_first_name`, `founder_last_name` | Only if the site calls the person a founder or co-founder (a CEO who isn't called a founder doesn't count). Leave blank if it doesn't |
+| `other_founders` | Any other founders the site names, separated by `;` (e.g. `Sam Bobb; Max`). Naming any of them also counts as correct |
 | `hook_ok` | `yes` if every claim in `model_hook` is true and on the site, `no` otherwise |
 | `checked` | `yes` once you've checked the row |
 

@@ -175,29 +175,38 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
 ## How well it works
 
 Measured on 30 real startups that seedreach found, each checked by hand against its website (company
-name, domain, founder, and whether every claim in the opening line is true). The pages are saved, so a
-score only changes when the code changes. Model: `gemini-flash-lite-latest`, 3 runs, 2026-11-01.
+name, domain, every founder the site names, and whether every claim in the opening line is true).
+Model: `gemini-flash-lite-latest`, 3 runs, 2026-11-01.
 
 | Metric | Score | What it means |
 |---|---|---|
 | Company name | 96% | Right name for the company |
-| Domain | 93% | Right category, so the right project of yours gets pitched |
-| Founder correct | 74% | Right founder, or correctly none when the site names no founder |
-| Invented founder | **0%** | Named someone the site doesn't call a founder (the worst mistake: a wrong name in the greeting) |
-| Opening line follows the rules | 93–100% | One sentence, no flattery, no markdown |
-| Same answers on every run | 100% | Same domain and founder each time on the same page |
-| Ready to send | 53–57% | Everything above right at once, on the right website |
+| Domain | 85–89% | Right category, so the right project of yours gets pitched |
+| Founder correct | 93–100% | One of the site's founders, or correctly none when the site names no founder |
+| Invented founder | 0–4% | Named someone the site doesn't call a founder (the worst mistake: a wrong name in the greeting) |
+| Opening line follows the rules | 93–96% | One sentence, no flattery, no markdown |
+| Same answers on every run | 83% | Same domain and founder each time on the same page |
+| Ready to send | 63–70% | Everything above right at once, on the right website |
 
-The last hand check of the opening lines found every claim true in 93% of them. The "ready to send"
-figure above doesn't include that check for the newest lines, so the real value is a little lower.
+The opening lines in this run haven't been checked by hand yet (the last check found every claim true in
+93% of them), so "ready to send" counts only the rule checks and is a little high.
+
+How it got here, on the same 30 startups:
+
+| Change | Founder correct | Invented founder | Ready to send |
+|---|---|---|---|
+| Baseline | 63% | 11% | 43% |
+| Count only people the site calls a founder | 74% | 0% | 53–57% |
+| Scraper reads team and leadership pages first | 93–100% | 0–4% | 63–70% |
 
 Known gaps, each the subject of a follow-up:
 
-- **Missed founders**: most are on a team page the scraper didn't open, or past the 12,000-character
-  limit, so the model never saw the name.
+- **Board members**: one site lists a real co-founder only under "Board of Directors", and the model
+  sometimes names him anyway.
 - **Wrong websites**: 3 of the 30 leads pointed at a news article or a job board, and seedreach drafted
   for them anyway.
-- **Consumer and health companies** are sometimes filed as B2B SaaS.
+- **Domains**: reading more pages made the domain slightly less accurate and less stable; consumer and
+  health companies are sometimes filed as B2B SaaS or AI Agents.
 
 To run the evals on your own set of startups, see [evals/README.md](evals/README.md). The dataset itself
 isn't in the repo, because it holds real founder names.
