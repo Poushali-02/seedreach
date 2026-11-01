@@ -172,6 +172,36 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
   companies are never processed again (use `target <url> --force` to retry a skipped one). LLM or Gmail
   outages are not recorded as skips, so those companies are retried next time.
 
+## How well it works
+
+Measured on 30 real startups that seedreach found, each checked by hand against its website (company
+name, domain, founder, and whether every claim in the opening line is true). The pages are saved, so a
+score only changes when the code changes. Model: `gemini-flash-lite-latest`, 3 runs, 2026-11-01.
+
+| Metric | Score | What it means |
+|---|---|---|
+| Company name | 96% | Right name for the company |
+| Domain | 93% | Right category, so the right project of yours gets pitched |
+| Founder correct | 74% | Right founder, or correctly none when the site names no founder |
+| Invented founder | **0%** | Named someone the site doesn't call a founder (the worst mistake: a wrong name in the greeting) |
+| Opening line follows the rules | 93–100% | One sentence, no flattery, no markdown |
+| Same answers on every run | 100% | Same domain and founder each time on the same page |
+| Ready to send | 53–57% | Everything above right at once, on the right website |
+
+The last hand check of the opening lines found every claim true in 93% of them. The "ready to send"
+figure above doesn't include that check for the newest lines, so the real value is a little lower.
+
+Known gaps, each the subject of a follow-up:
+
+- **Missed founders**: most are on a team page the scraper didn't open, or past the 12,000-character
+  limit, so the model never saw the name.
+- **Wrong websites**: 3 of the 30 leads pointed at a news article or a job board, and seedreach drafted
+  for them anyway.
+- **Consumer and health companies** are sometimes filed as B2B SaaS.
+
+To run the evals on your own set of startups, see [evals/README.md](evals/README.md). The dataset itself
+isn't in the repo, because it holds real founder names.
+
 ## Run it on a schedule (free, GitHub Actions)
 
 Your laptop does not need to be on. A small **private** repo runs seedreach on a schedule, pulls this
