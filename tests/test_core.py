@@ -15,7 +15,7 @@ from src.enrichment.email_finder import EmailFinder
 from src.intelligence.extractor import CompanyProfile
 from src.intelligence.scraper import _parse
 from src.config import ROOT
-from src.outreach.generator import generate_email
+from src.outreach.generator import generate_email, generate_linkedin_note
 from src.profile import ProfileError, load_profile
 from src.sourcing.hacker_news import parse_job_comment
 from src.utils import domain_of, normalize_url
@@ -82,6 +82,28 @@ def test_generator_greeting_and_empty_optional_fields():
     assert body.startswith("Hi Shiplog team,")
     assert "Phone" not in body and body.rstrip().endswith("Alex Example")  # phone is blank in the example
 
+
+def test_generate_linkedin_note_is_short_and_plain_text():
+    # Test with the standard mocked company
+    c = _company("Other")
+    note = generate_linkedin_note(c, PROFILE)
+    
+    assert len(note) <= 300
+    assert not re.search(r"[*#`]", note)
+    assert "Ada" in note
+    assert "Shiplog" in note
+
+def test_generate_linkedin_note_truncates_long_hooks():
+    # Create a company with a massive personalized hook to force truncation
+    long_hook = "I was curious how " + ("very long text " * 30) + "diffs release notes."
+    c = _company("Other", personalized_hook=long_hook)
+    
+    note = generate_linkedin_note(c, PROFILE)
+    
+    # It must still be under 300 chars, and must have been truncated with "..."
+    assert len(note) <= 300
+    assert "..." in note
+    assert not re.search(r"[*#`]", note)
 
 def test_profile_validation(tmp_path: Path):
     with pytest.raises(ProfileError, match="not found"):

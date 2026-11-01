@@ -52,3 +52,31 @@ def generate_email(company: CompanyProfile, profile: Profile) -> EmailDraft:
     _assert_plain_text(body)
     _assert_plain_text(subject)
     return EmailDraft(subject=subject, body=body)
+
+def generate_linkedin_note(company: CompanyProfile, profile: Profile) -> str:
+    """Draft a plain-text LinkedIn connection note under 300 characters."""
+    name = strip_markdown(company.company_name)
+    first = strip_markdown(company.founder_first_name) if company.founder_first_name else ""
+    greeting = f"Hi {first}, " if first else f"Hi {name} team, "
+
+    hook = strip_markdown(company.personalized_hook)
+    intro = f"I'm {profile.first_name}, {profile.intro}."
+    closing = "I'd love to connect!"
+    
+    note = f"{greeting}{hook} {intro} {closing}"
+    
+    if len(note) > 300:
+        # Calculate exactly how much space is left for the hook
+        fixed_length = len(greeting) + len(intro) + len(closing) + 5 # 5 for spaces and "..."
+        allowed_hook_length = 300 - fixed_length
+        
+        if allowed_hook_length > 0:
+            # Truncate at a word boundary using rsplit
+            truncated_hook = hook[:allowed_hook_length].rsplit(' ', 1)[0]
+            note = f"{greeting}{truncated_hook}... {intro} {closing}"
+        else:
+            note = f"{greeting}{intro} {closing}"
+            note = note[:297] + "..."
+            
+    _assert_plain_text(note)
+    return note

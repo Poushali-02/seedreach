@@ -11,7 +11,7 @@ from src.db import Database
 from src.enrichment.email_finder import EmailFinder
 from src.intelligence.extractor import ExtractionError, Extractor
 from src.intelligence.scraper import ScrapeError, Scraper
-from src.outreach.generator import EmailDraft, generate_email
+from src.outreach.generator import EmailDraft, generate_email, generate_linkedin_note
 from src.outreach.gmail_client import GmailDraftClient, GmailError
 from src.profile import load_profile
 from src.sourcing.base import BaseSourcingProvider, Lead
@@ -122,7 +122,9 @@ class Pipeline:
                               company_name=company.company_name, founder_name=founder)
 
         draft = generate_email(company, self.profile)
+        linkedin_note = generate_linkedin_note(company, self.profile)
         if self.dry_run:
+            print(f"LinkedIn Note:\n{linkedin_note}\n")
             return Result(domain, "drafted", f"dry run ({email.source}: {email.confidence})", draft, email.email)
 
         try:
