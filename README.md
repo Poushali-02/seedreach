@@ -165,8 +165,12 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
 - **Extraction**: the LLM must return JSON matching a Pydantic schema (company, summary, domain, founder
   name, one-sentence technical hook). Invalid output is retried once, and busy errors are retried with
   backoff. Founder names are only taken if the site states them (About and Team pages are fetched too).
-- **Email finding**: Apollo (if you set a key), then `mailto:` addresses on the site, then
-  `{first}@domain` with an MX record check. The source and confidence are stored per company.
+- **Email finding**, best first: Apollo-verified (if you set a key), the founder's own address on the site,
+  the founder's name in the format the site's addresses use (`first.last@`), anyone's address on the site,
+  then a generic inbox (`hello@`). A bare `{first}@domain` guess is **not drafted**: the company is listed
+  under *Needs a contact* in `status` so you can find an address and retry with `target <url> --force`
+  (`ALLOW_GUESSED_EMAILS=1` restores the old behaviour). A founder the model names is only used if the
+  site itself names them.
 - **Email copy**: your `projects` paragraph for the company's domain, plus your experience, stack and links.
 - **Dedupe**: one row per registrable domain, plus a unique index on drafted emails. Drafted and skipped
   companies are never processed again (use `target <url> --force` to retry a skipped one). LLM or Gmail

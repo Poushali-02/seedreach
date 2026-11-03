@@ -46,6 +46,20 @@ def domain_of(url: str) -> str:
     return registered_domain(host)
 
 
+_LEGAL_SUFFIX = re.compile(
+    r"[,\s]+(inc|llc|ltd|limited|gmbh|oy|ab|corp|corporation|co|pvt\.?\s*ltd|private limited|s\.?a\.?s?|b\.?v)\.?$",
+    re.I,
+)
+
+
+def display_name(company: str) -> str:
+    """The company name as people say it: 'Vernius Systems, Inc.' -> 'Vernius Systems'."""
+    name = company.strip()
+    while (stripped := _LEGAL_SUFFIX.sub("", name)) != name and stripped:
+        name = stripped
+    return name
+
+
 def strip_markdown(text: str) -> str:
     """Remove characters that would render as markdown in a plain-text email."""
     text = re.sub(r"[*#`]+", "", text)

@@ -208,6 +208,15 @@ class Database:
             "skipped": counts.get("skipped", 0),
         }
 
+    def needs_contact(self, limit: int = 10) -> list[sqlite3.Row]:
+        """Companies skipped only because no trustworthy address was found, newest first."""
+        with self._conn() as conn:
+            return conn.execute(
+                "SELECT domain, company_name, founder_name, reason FROM companies "
+                "WHERE status = 'skipped' AND reason LIKE 'needs contact%' ORDER BY updated_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+
     def recent_companies(self, limit: int = 10) -> list[sqlite3.Row]:
         with self._conn() as conn:
             return conn.execute(

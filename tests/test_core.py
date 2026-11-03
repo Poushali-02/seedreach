@@ -112,9 +112,27 @@ def test_mailto_prefers_founder_and_skips_support():
 def test_heuristic_requires_mx(monkeypatch: pytest.MonkeyPatch):
     f = _finder()
     monkeypatch.setattr(email_finder, "has_mx", lambda d: True)
-    assert f.find("x.com", "X", "Zoë", None, []).email == "zoe@x.com"
+    r = f.find("x.com", "X", "Zoë", None, [])
+    assert r.email == "zoe@x.com" and r.is_guess
     monkeypatch.setattr(email_finder, "has_mx", lambda d: False)
     assert f.find("x.com", "X", "Ada", None, []) is None
+
+
+def test_email_finder_order_and_site_pattern(monkeypatch: pytest.MonkeyPatch):
+    f = _finder()
+    monkeypatch.setattr(email_finder, "has_mx", lambda d: True)
+    # the founder's own address on the site beats everything else
+    r = f.find("x.com", "X", "Ada", "Lovelace", ["maria.lopez@x.com", "ada@x.com", "hello@x.com"])
+    assert (r.email, r.confidence) == ("ada@x.com", "on site")
+    # someone else's first.last address shows the format: the founder's address follows it
+    r = f.find("x.com", "X", "Ada", "Lovelace", ["maria.lopez@x.com", "hello@x.com"])
+    assert (r.email, r.confidence, r.is_guess) == ("ada.lovelace@x.com", "pattern from site", False)
+    r = f.find("x.com", "X", "Ada", None, ["maria@x.com"])
+    assert (r.email, r.confidence) == ("ada@x.com", "pattern from site")
+    # first.last needs a last name; without one, fall back to what the site prints
+    assert f.find("x.com", "X", "Ada", None, ["maria.lopez@x.com"]).email == "maria.lopez@x.com"
+    assert f.find("x.com", "X", "Ada", None, ["hello@x.com"]).confidence == "generic"
+    assert f.find("x.com", "X", "Ada", None, ["jobs@x.com"]).is_guess
 
 
 # ---- scraper / sourcing parsing ---------------------------------------
@@ -494,7 +512,7 @@ def _traced_pipeline(tmp_path: Path, founder_text: str):
     pipe.scraper = NS(fetch=lambda url: ScrapedPage(
         url=url, domain="useshiplog.com", text=founder_text, pages=[url, url + "/about"], truncated=True))
     pipe.extractor = FakeExtractor()
-    pipe.finder = NS(find=lambda *a: EmailResult("ada@useshiplog.com", "heuristic", "guess"))
+    pipe.finder = NS(find=lambda *a: EmailResult("ada@useshiplog.com", "heuristic", "pattern from site"))
     pipe.gmail = NS(create_draft=lambda *a: "draft-1")
     return pipe
 
@@ -507,7 +525,7 @@ def test_pipeline_records_a_trace_per_company(tmp_path: Path):
     (t,) = pipe.traces
     assert (t.domain, t.outcome, t.pages, t.truncated, t.llm_calls, t.input_tokens) == (
         "useshiplog.com", "drafted", 2, True, 1, 900)
-    assert t.founder_in_text is True and t.email_source == "heuristic (guess)"
+    assert t.founder_in_text is True and t.email_source == "heuristic (pattern from site)"
     assert set(t.ms) == {"scrape", "extract", "email", "draft"}
 
     (run,) = pipe.db.recent_runs()
@@ -530,3 +548,42 @@ def test_dry_run_traces_stay_in_memory(tmp_path: Path):
     pipe.dry_run = True
     pipe.process("https://useshiplog.com", "hn")
     assert len(pipe.traces) == 1 and pipe.db.recent_runs() == []
+
+
+# ---- reaching real people (v0.3.1) ------------------------------------------
+def test_display_name_drops_legal_endings():
+    from src.utils import display_name
+
+    assert display_name("Vernius Systems, Inc.") == "Vernius Systems"
+    assert display_name("Revieve Oy") == "Revieve"
+    assert display_name("Acme Pvt. Ltd.") == "Acme"
+    assert display_name("Coverage Cat") == "Coverage Cat" and display_name("Inc") == "Inc"
+    assert "Vernius Systems team" in generate_email(_company("Other", company_name="Vernius Systems, Inc.",
+                                                            founder_first_name=None), PROFILE).body
+
+
+def test_guessed_address_is_not_drafted_unless_allowed(tmp_path: Path):
+    from types import SimpleNamespace as NS
+    from src.enrichment.email_finder import EmailResult
+
+    pipe = _traced_pipeline(tmp_path, "Shiplog was started by Ada.")
+    pipe.finder = NS(find=lambda *a: EmailResult("ada@useshiplog.com", "heuristic", "guess"))
+    r = pipe.process("https://useshiplog.com", "hn")
+    assert r.outcome == "skipped" and r.detail.startswith("needs contact: guessed ada@useshiplog.com")
+    (row,) = pipe.db.needs_contact()
+    assert row["domain"] == "useshiplog.com" and row["founder_name"] == "Ada"
+
+    (tmp_path / "allowed").mkdir()
+    pipe = _traced_pipeline(tmp_path / "allowed", "Shiplog was started by Ada.")
+    pipe.settings = Settings(allow_guessed_emails=True)
+    pipe.finder = NS(find=lambda *a: EmailResult("ada@useshiplog.com", "heuristic", "guess"))
+    assert pipe.process("https://useshiplog.com", "hn").outcome == "drafted"
+
+
+def test_founder_not_on_the_page_is_not_used(tmp_path: Path):
+    seen = {}
+    pipe = _traced_pipeline(tmp_path, "Changelogs for monorepos.")  # the page never names Ada
+    real_find = pipe.finder.find
+    pipe.finder.find = lambda domain, company, first, last, mailtos: seen.update(first=first) or real_find()
+    r = pipe.process("https://useshiplog.com", "hn")
+    assert seen["first"] is None and r.draft.body.startswith("Hi Shiplog team,")

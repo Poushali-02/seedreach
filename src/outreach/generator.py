@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from src.intelligence.extractor import CompanyProfile
 from src.profile import Profile
-from src.utils import strip_markdown
+from src.utils import display_name, strip_markdown
 
 
 @dataclass(frozen=True)
@@ -22,7 +22,7 @@ def _assert_plain_text(text: str) -> None:
 
 
 def generate_email(company: CompanyProfile, profile: Profile) -> EmailDraft:
-    name = strip_markdown(company.company_name)
+    name = display_name(company.company_name)
     first = strip_markdown(company.founder_first_name) if company.founder_first_name else ""
     greeting = f"Hi {first}," if first else f"Hi {name} team,"
     projects = "\n\n".join(profile.projects_for(company.core_domain))

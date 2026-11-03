@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     yc_max_team_size: int = 25  # YC directory: skip companies larger than this
     log_level: str = "INFO"
     headless: bool = False  # set on servers/CI: never open a browser for Gmail sign-in
+    allow_guessed_emails: bool = False  # draft to {first}@domain guesses with no evidence (most bounce or go unread)
 
     @field_validator("google_credentials_file", "google_token_file", "db_path")
     @classmethod
