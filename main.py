@@ -176,6 +176,14 @@ def status(events: int = typer.Option(10, "--events", "-e", help="How many recen
                 str(r["truncated"]), str(r["founder_not_in_text"]),
             )
         console.print(table)
+    waiting = db.needs_contact(10)
+    if waiting:
+        table = Table(title="Needs a contact", caption="Find an address you trust, then: python main.py target <url> --force")
+        for col in ("Domain", "Company", "Founder", "Why"):
+            table.add_column(col)
+        for r in waiting:
+            table.add_row(r["domain"], r["company_name"] or "-", r["founder_name"] or "-", r["reason"])
+        console.print(table)
     log_rows = db.recent_events(events)
     if log_rows:
         console.print("\n[bold]Recent events[/bold]")

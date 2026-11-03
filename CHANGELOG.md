@@ -5,6 +5,18 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+### Changed
+- No more drafts to bare guesses. Every address now has a confidence (`verified`, `on site`,
+  `pattern from site`, `generic`, `guess`), and a `{first}@domain` guess with nothing behind it is
+  recorded as "needs contact" instead of drafted; `status` lists these with the guessed address
+  (#3). In v0.3.0's runs, 54% of drafts went to such guesses. `ALLOW_GUESSED_EMAILS=1` restores the
+  old behaviour.
+- If the site shows someone's address in a `first.last@` or `first@` format, the founder's address
+  follows that format instead of being a blind guess.
+- A founder the model names is only used if the site names them too; otherwise the draft greets the
+  team (#32).
+- Greetings and subjects drop legal endings: "Hi Vernius Systems team", not "Vernius Systems, Inc." (#32).
+
 ## [0.3.0] - 2026-11-01
 
 Measured, then fixed: on 30 hand-checked startups, ready-to-send drafts went from 43% to 63–70% and

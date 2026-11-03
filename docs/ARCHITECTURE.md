@@ -27,8 +27,10 @@ python main.py run --limit 5
    3. Asks the LLM for a structured `CompanyProfile`: name, summary, domain, founder name and a
       one-line technical opener (`src/intelligence/extractor.py`). The output is validated with
       Pydantic and retried once if invalid.
-   4. Finds an email in this order: Apollo (if configured), `mailto:` links on the site, then an
-      MX-checked `{first}@domain` guess (`src/enrichment/email_finder.py`).
+   4. Finds an email, best first: Apollo-verified (if configured), the founder's own address on the
+      site, the founder's name in the site's address format, anyone's address on the site, a generic
+      inbox (`src/enrichment/email_finder.py`). A bare `{first}@domain` guess is recorded as
+      "needs contact" instead of drafted, unless `ALLOW_GUESSED_EMAILS` is set.
    5. Writes a plain-text draft from your `profile.json`, choosing the project paragraph that matches
       the company's domain (`src/outreach/generator.py`).
    6. Saves it to Gmail Drafts (`src/outreach/gmail_client.py`) and records it in SQLite (`src/db.py`).

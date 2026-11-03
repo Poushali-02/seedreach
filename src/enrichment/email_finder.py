@@ -1,4 +1,13 @@
-"""Find a founder's email: Apollo -> homepage mailto -> {first}@domain + MX check."""
+"""Find a founder's email: Apollo -> addresses on the site -> a guess in the site's address format.
+
+Every result carries a confidence:
+  verified           Apollo says the mailbox exists
+  on site            a personal address printed on the company's pages
+  generic            hello@ / founders@ / team@ printed on the site
+  pattern from site  the founder's name in the format the site's own addresses use (first.last@, first@)
+  guess              {first}@domain with no evidence beyond an MX record; the pipeline does not draft these
+                     unless ALLOW_GUESSED_EMAILS is set
+"""
 
 from __future__ import annotations
 
@@ -26,13 +35,18 @@ _BAD_LOCALPARTS = {
 _GENERIC_OK = {"founders", "founder", "hello", "hi", "team", "contact", "info", "hey"}
 
 Source = Literal["apollo", "mailto", "heuristic"]
+GUESS = "guess"
 
 
 @dataclass(frozen=True)
 class EmailResult:
     email: str
     source: Source
-    confidence: str  # human-readable: verified / likely / generic / guess
+    confidence: str  # verified / on site / generic / pattern from site / guess (see module docstring)
+
+    @property
+    def is_guess(self) -> bool:
+        return self.confidence == GUESS
 
 
 def _slug(name: str) -> str:
@@ -79,36 +93,42 @@ class EmailFinder:
         return EmailResult(email, "apollo", "verified" if status == "verified" else f"apollo:{status}")
 
     @staticmethod
-    def _from_mailtos(domain: str, mailtos: list[str], first: Optional[str]) -> Optional[EmailResult]:
+    def _site_addresses(domain: str, mailtos: list[str]) -> tuple[list[str], list[str]]:
+        """(personal, generic) addresses at the company's domain, minus inboxes nobody reads as a person."""
         usable = [m for m in mailtos if m.endswith("@" + domain) or m.endswith("." + domain)]
         usable = [m for m in usable if m.split("@")[0] not in _BAD_LOCALPARTS]
-        if first:
-            f = _slug(first)
-            for m in usable:
-                if f and f in _slug(m.split("@")[0]):
-                    return EmailResult(m, "mailto", "likely")
-        personal = [m for m in usable if m.split("@")[0] not in _GENERIC_OK]
-        if personal:
-            return EmailResult(personal[0], "mailto", "likely")
-        generic = [m for m in usable if m.split("@")[0] in _GENERIC_OK]
-        if generic:
-            return EmailResult(generic[0], "mailto", "generic")
-        return None
+        return ([m for m in usable if m.split("@")[0] not in _GENERIC_OK],
+                [m for m in usable if m.split("@")[0] in _GENERIC_OK])
 
     @staticmethod
-    def _heuristic(domain: str, first: Optional[str]) -> Optional[EmailResult]:
-        slug = _slug(first or "")
-        if not slug or not has_mx(domain):
-            return None
-        return EmailResult(f"{slug}@{domain}", "heuristic", "guess (MX ok, mailbox unverified)")
+    def _site_pattern(personal: list[str]) -> Optional[str]:
+        """The format the site's own personal addresses use: 'first.last', 'first_last' or 'first'."""
+        local_parts = [m.split("@")[0] for m in personal]
+        for sep in (".", "_"):
+            if any(re.fullmatch(rf"[a-z]+\{sep}[a-z]+", p) for p in local_parts):
+                return f"first{sep}last"
+        return "first" if any(re.fullmatch(r"[a-z]{2,}", p) for p in local_parts) else None
 
     # ---- public --------------------------------------------------------
     def find(
         self, domain: str, company: str, first: Optional[str], last: Optional[str], mailtos: list[str],
     ) -> Optional[EmailResult]:
-        if first:
-            if result := self._apollo(domain, company, first, last):
-                return result
-        if result := self._from_mailtos(domain, mailtos, first):
+        """Best address in order: verified, the founder's own on the site, the founder's in the site's format,
+        anyone's on the site, a generic inbox, then a bare guess."""
+        f, l = _slug(first or ""), _slug(last or "")
+        if first and (result := self._apollo(domain, company, first, last)):
             return result
-        return self._heuristic(domain, first)
+        personal, generic = self._site_addresses(domain, mailtos)
+        if f and (mine := next((m for m in personal + generic if f in _slug(m.split("@")[0])), None)):
+            return EmailResult(mine, "mailto", "on site")
+        pattern = self._site_pattern(personal)
+        if f and pattern and (pattern == "first" or l) and has_mx(domain):
+            local = f if pattern == "first" else f"{f}{pattern[5]}{l}"
+            return EmailResult(f"{local}@{domain}", "heuristic", "pattern from site")
+        if personal:
+            return EmailResult(personal[0], "mailto", "on site")
+        if generic:
+            return EmailResult(generic[0], "mailto", "generic")
+        if f and has_mx(domain):
+            return EmailResult(f"{f}@{domain}", "heuristic", GUESS)
+        return None

@@ -27,6 +27,7 @@ log = logging.getLogger(__name__)
 
 # Outcomes: drafted | skipped (recorded, never retried) | duplicate (already known) | error (not recorded, retryable)
 Reporter = Callable[["Result"], None]
+NEEDS_CONTACT = "needs contact"  # skip reason prefix: a company worth writing to, but no address we trust
 
 
 @dataclass
@@ -130,6 +131,8 @@ class Pipeline:
             trace.model, trace.llm_calls = self.extractor.model, usage.calls
             trace.input_tokens, trace.output_tokens = usage.input_tokens, usage.output_tokens
         trace.founder_in_text = name_in_text(company.founder_first_name, company.founder_last_name, page.text)
+        if trace.founder_in_text is False:  # named from memory, not the page: greet the team instead
+            company = company.model_copy(update={"founder_first_name": None, "founder_last_name": None})
 
         founder = " ".join(p for p in (company.founder_first_name, company.founder_last_name) if p) or None
         with trace.timed("email"):
@@ -141,6 +144,9 @@ class Pipeline:
             return self._skip(domain, url, source, "no founder email found",
                               company_name=company.company_name, founder_name=founder)
         trace.email_source = f"{email.source} ({email.confidence})"
+        if email.is_guess and not self.settings.allow_guessed_emails:
+            return self._skip(domain, url, source, f"{NEEDS_CONTACT}: guessed {email.email}, not verified",
+                              company_name=company.company_name, founder_name=founder)
         if self.db.email_taken(email.email):
             return self._skip(domain, url, source, f"email {email.email} already drafted",
                               company_name=company.company_name, founder_name=founder)
