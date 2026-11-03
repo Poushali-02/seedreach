@@ -16,6 +16,11 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 - A founder the model names is only used if the site names them too; otherwise the draft greets the
   team (#32).
 - Greetings and subjects drop legal endings: "Hi Vernius Systems team", not "Vernius Systems, Inc." (#32).
+- News articles and job-board pages are skipped instead of drafted (#30). Known job-board and news hosts
+  (Teamtailor, Factorial, Lever, Greenhouse, TechCrunch, …) are skipped before any scraping or LLM call,
+  and the model now labels every other page (`page_type`: company, news, job board, other). The skip
+  reason names the company so you can add its real website with `target`. The evals report how many
+  wrong-website leads are caught and how many company sites are wrongly flagged.
 
 ## [0.3.0] - 2026-11-01
 

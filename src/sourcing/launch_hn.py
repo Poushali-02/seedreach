@@ -15,8 +15,7 @@ import httpx
 
 from src.config import Settings
 from src.sourcing.base import BaseSourcingProvider, Lead
-from src.sourcing.hacker_news import _is_company_host
-from src.utils import strip_markdown
+from src.utils import is_company_host, strip_markdown
 
 log = logging.getLogger(__name__)
 
@@ -29,7 +28,7 @@ def parse_launch(hit: dict[str, Any]) -> Optional[Lead]:
     """A Launch HN story becomes a lead only if it links to the company's own site."""
     url = (hit.get("url") or "").strip()
     host = urlparse(url).hostname or ""
-    if not url.startswith("http") or not _is_company_host(host):
+    if not url.startswith("http") or not is_company_host(host):
         return None  # text-only posts, or links to GitHub, YouTube and the like
     title = strip_markdown(hit.get("title") or "")
     match = _NAME_RE.match(title)
