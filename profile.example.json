@@ -11,6 +11,7 @@
   "phone": "",
   "subject": "Backend engineering internship - {company}",
   "closing": "If it would be useful, I'm happy to share more detail or jump on a short call.",
+  "email_style": "short",
   "projects": {
     "DevTools": ["I built ExampleScan, a CLI that checks dependencies against public advisory feeds."],
     "Fintech": ["I built ExamplePay, a payments ledger service with idempotent transaction APIs on PostgreSQL."],

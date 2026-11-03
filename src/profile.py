@@ -32,6 +32,8 @@ class Profile:
     phone: str = ""
     subject: str = "Internship inquiry - {company}"
     closing: str = "If it would be useful, I'm happy to share more detail or jump on a short call."
+    email_style: str = "short"  # "short": ~120 words, one project, one ask; "long": every section below
+    ask: str = ""  # the short email's last line; may use {company}. Empty: a default ask
 
     @property
     def first_name(self) -> str:
@@ -59,6 +61,8 @@ def load_profile(path: Path = PROFILE_PATH) -> Profile:
     if missing:
         raise ProfileError(f"Missing required field(s) in {path.name}: {', '.join(missing)}")
 
+    if data.get("email_style", "short") not in ("short", "long"):
+        raise ProfileError(f'"email_style" in {path.name} must be "short" or "long".')
     projects = data["projects"]
     if not isinstance(projects, dict) or "Other" not in projects:
         raise ProfileError('"projects" must be an object that includes an "Other" fallback entry.')
