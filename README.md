@@ -71,13 +71,15 @@ Edit `profile.json`. It is git-ignored, so your details stay on your machine.
 |---|---|---|
 | `name` | yes | Your full name. The first word is used in the intro. |
 | `intro` | yes | Completes "I'm Alex, ..." e.g. `a Computer Science student (graduating 2028) based in Lisbon`. |
-| `role_pitch` | yes | Completes "I'd love to join Company as ..." e.g. `a remote Backend intern.` |
-| `experience` | yes | One or two sentences about your most relevant experience. |
+| `role_pitch` | yes | Completes "I'd love to join Company as ..." e.g. `a remote Backend intern.` (long emails) |
+| `experience` | yes | One or two sentences about your most relevant experience. (long emails) |
 | `stack` | yes | Your core technologies, as a phrase. |
-| `projects` | yes | Paragraphs per company domain: `DevTools`, `Fintech`, `AI Agents`, `B2B SaaS`, and a required `Other` fallback. |
+| `projects` | yes | Paragraphs per company domain: `DevTools`, `Fintech`, `AI Agents`, `B2B SaaS`, and a required `Other` fallback. Short emails use the **first sentence of the first paragraph**, so make that sentence your strongest proof (e.g. `I built Angizo (1st prize, Hexafalls 2026), ...`). |
 | `portfolio`, `github`, `linkedin`, `resume`, `phone` | no | Shown at the bottom. Blank ones are left out. |
 | `subject` | no | Subject line; `{company}` is replaced with the company name. |
-| `closing` | no | The closing line before your links. |
+| `closing` | no | The closing line before your links. (long emails) |
+| `email_style` | no | `short` (default, about 100–130 words: opener, who you are, one project, one ask, two links) or `long` (every section above). |
+| `ask` | no | The short email's last line; `{company}` is replaced. Default: *Would you be open to a remote intern at {company}? I'd be glad to start with a short trial task.* |
 
 Plain text only: emails must not contain `*`, `#` or backticks, and the generator refuses to build a draft
 that does.
@@ -171,7 +173,9 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
   under *Needs a contact* in `status` so you can find an address and retry with `target <url> --force`
   (`ALLOW_GUESSED_EMAILS=1` restores the old behaviour). A founder the model names is only used if the
   site itself names them.
-- **Email copy**: your `projects` paragraph for the company's domain, plus your experience, stack and links.
+- **Email copy**: short by default (about 100–130 words): the opener, who you are, the first sentence of your
+  project for the company's domain, one ask and two links. `"email_style": "long"` adds your role pitch, every
+  matching project, experience, stack, closing and all links.
 - **Wrong pages**: a lead that points at a news article or a job-board posting is skipped, not drafted. Known
   hosts are skipped before scraping; the model labels the rest. The reason names the company, so you can add
   its real site with `target`.

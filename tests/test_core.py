@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import ast
 import base64
+import dataclasses
+import json
 import re
 from pathlib import Path
 
@@ -55,6 +57,7 @@ def test_db_dedupes_domain_and_email(tmp_path: Path):
 
 # ---- profile + generator ----------------------------------------------
 PROFILE = load_profile(ROOT / "profile.example.json")
+LONG = dataclasses.replace(PROFILE, email_style="long")
 
 
 @pytest.mark.parametrize("domain,expected", [
@@ -64,11 +67,11 @@ PROFILE = load_profile(ROOT / "profile.example.json")
     ("Other", ["ExampleCRM"]),
 ])
 def test_generator_matches_domain(domain: str, expected: list[str]):
-    body = generate_email(_company(domain), PROFILE).body
-    for needle in expected:
-        assert needle in body
-    for needle in ["ExampleCo", "https://example.dev", "github.com/example", "Alex Example"]:
-        assert needle in body
+    for profile in (PROFILE, LONG):
+        body = generate_email(_company(domain), profile).body
+        for needle in expected + ["https://example.dev", "github.com/example", "Alex Example"]:
+            assert needle in body
+    assert "ExampleCo" in generate_email(_company(domain), LONG).body  # experience is long-only
 
 
 def test_generator_is_plain_text_even_with_markdown_input():
@@ -78,9 +81,23 @@ def test_generator_is_plain_text_even_with_markdown_input():
 
 
 def test_generator_greeting_and_empty_optional_fields():
-    body = generate_email(_company("Other", founder_first_name=None), PROFILE).body
-    assert body.startswith("Hi Shiplog team,")
-    assert "Phone" not in body and body.rstrip().endswith("Alex Example")  # phone is blank in the example
+    for profile in (PROFILE, LONG):
+        body = generate_email(_company("Other", founder_first_name=None), profile).body
+        assert body.startswith("Hi Shiplog team,")
+        assert "Phone" not in body and body.rstrip().endswith("Alex Example")  # phone is blank in the example
+
+
+def test_short_email_is_short_with_one_project_and_one_ask():
+    from src.outreach.generator import DEFAULT_ASK, _first_sentence
+
+    body = generate_email(_company("DevTools"), PROFILE).body
+    assert len(body.split()) <= 130 and body.count("\n\n") == 5  # 6 sections
+    assert DEFAULT_ASK.replace("{company}", "Shiplog") in body and "linkedin.com" not in body  # two links only
+    custom = dataclasses.replace(PROFILE, ask="Could I help {company} as an intern this summer?")
+    assert "Could I help Shiplog as an intern this summer?" in generate_email(_company("DevTools"), custom).body
+    assert _first_sentence("I built X on OSV.dev feeds. It also does Y.") == "I built X on OSV.dev feeds."
+    assert _first_sentence("No full stop here") == "No full stop here"
+    assert len(generate_email(_company("DevTools"), LONG).body.split()) > len(body.split())
 
 
 def test_profile_validation(tmp_path: Path):
@@ -92,6 +109,10 @@ def test_profile_validation(tmp_path: Path):
         load_profile(bad)
     bad.write_text('{"nme": "A"}', encoding="utf-8")
     with pytest.raises(ProfileError, match="Unknown field"):
+        load_profile(bad)
+    good = json.loads((ROOT / "profile.example.json").read_text(encoding="utf-8"))
+    bad.write_text(json.dumps({**good, "email_style": "medium"}), encoding="utf-8")
+    with pytest.raises(ProfileError, match="email_style"):
         load_profile(bad)
 
 

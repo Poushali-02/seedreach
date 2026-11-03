@@ -16,6 +16,10 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 - A founder the model names is only used if the site names them too; otherwise the draft greets the
   team (#32).
 - Greetings and subjects drop legal endings: "Hi Vernius Systems team", not "Vernius Systems, Inc." (#32).
+- Drafts are short by default (#31): the opener, who you are, the first sentence of your best-matching
+  project, one ask and two links, about 100–130 words (they were about 190–220 words in 8–9
+  paragraphs). `"email_style": "long"` in `profile.json` keeps the previous email; `"ask"` changes the
+  last line.
 - News articles and job-board pages are skipped instead of drafted (#30). Known job-board and news hosts
   (Teamtailor, Factorial, Lever, Greenhouse, TechCrunch, …) are skipped before any scraping or LLM call,
   and the model now labels every other page (`page_type`: company, news, job board, other). The skip
