@@ -24,6 +24,7 @@ _RETRY_DELAYS = (3, 8, 20)  # seconds between attempts on rate-limit / overload 
 
 Domain = Literal["DevTools", "AI Agents", "Fintech", "B2B SaaS", "Other"]
 PageType = Literal["company", "news", "job_board", "other"]
+Stage = Literal["pre-seed/seed", "early", "growth/large", "unknown"]
 TOOL_NAME = "record_company"
 
 SYSTEM_PROMPT = """You analyse startup websites for a job-seeking engineer who writes cold emails.
@@ -36,6 +37,9 @@ Rules:
   a directory or aggregator listing many companies). The other fields describe the company the page is
   about either way.
 - core_domain: pick the single best fit. DevTools includes developer security tooling.
+- stage: "pre-seed/seed" for a founding team or pre-launch/waitlist project; "early" for Series A/B
+  startups with growing engineering teams; "growth/large" for Series C+, public companies, or large
+  established corporates (e.g. Discord, Fastly, Stripe, Datadog); "unknown" if clues are insufficient.
 - founder_first_name / founder_last_name: ONLY if the text names the person as a founder or
   co-founder. A CEO, CTO or board member who is not called a founder does not count. Never guess,
   infer a name from the company name or an email address, or use names you know from elsewhere.
@@ -52,6 +56,7 @@ class CompanyProfile(BaseModel):
     company_name: str
     one_line_summary: str
     core_domain: Domain
+    stage: Stage = "unknown"
     founder_first_name: Optional[str] = None
     founder_last_name: Optional[str] = None
     personalized_hook: str
