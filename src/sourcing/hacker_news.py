@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 
 from src.config import Settings
 from src.sourcing.base import BaseSourcingProvider, Lead
-from src.utils import strip_markdown
+from src.utils import is_company_host, strip_markdown
 
 log = logging.getLogger(__name__)
 
@@ -29,21 +29,6 @@ _ROLE_RE = re.compile(
 )
 _AI_RE = re.compile(r"\b(AI|ML|LLMs?)\b|\bagentic\b", re.I)  # AI/ML matched loosely but on word boundary
 _REMOTE_RE = re.compile(r"\bremote\b", re.I)
-
-# Job boards / socials / docs: a link here is not the company's own site.
-_NON_COMPANY_SUFFIXES = (
-    "ycombinator.com", "lever.co", "greenhouse.io", "ashbyhq.com", "workable.com", "linkedin.com",
-    "github.com", "twitter.com", "x.com", "wellfound.com", "angel.co", "notion.site", "notion.so",
-    "docs.google.com", "drive.google.com", "bamboohr.com", "smartrecruiters.com", "recruitee.com",
-    "breezy.hr", "myworkdayjobs.com", "workatastartup.com", "jobs.gem.com", "rippling.com",
-    "calendly.com", "forms.gle", "typeform.com", "medium.com", "youtube.com", "t.me", "discord.gg",
-)
-
-
-def _is_company_host(host: str) -> bool:
-    host = host.lower()
-    return bool(host) and not host.endswith(_NON_COMPANY_SUFFIXES) and not host.startswith(("jobs.", "careers."))
-
 
 def parse_job_comment(html: str) -> Optional[Lead]:
     """Turn one HN job comment into a Lead (or None if it doesn't match our criteria)."""
@@ -58,7 +43,7 @@ def parse_job_comment(html: str) -> Optional[Lead]:
     for a in soup.find_all("a", href=True):
         href = a["href"].strip()
         host = urlparse(href).hostname or ""
-        if href.startswith("http") and _is_company_host(host):
+        if href.startswith("http") and is_company_host(host):
             url = href
             break
     if not url:

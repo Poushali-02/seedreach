@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Callable, Iterator, Optional
+from urllib.parse import urlparse
 
 from src.config import Settings
 from src.db import Database
@@ -21,13 +22,19 @@ from src.sourcing.launch_hn import LaunchHNProvider
 from src.sourcing.product_hunt import ProductHuntProvider
 from src.sourcing.yc_directory import YCDirectoryProvider
 from src.trace import Trace, name_in_text
-from src.utils import domain_of, normalize_url
+from src.utils import domain_of, non_company_kind, normalize_url
 
 log = logging.getLogger(__name__)
 
 # Outcomes: drafted | skipped (recorded, never retried) | duplicate (already known) | error (not recorded, retryable)
 Reporter = Callable[["Result"], None]
 NEEDS_CONTACT = "needs contact"  # skip reason prefix: a company worth writing to, but no address we trust
+_PAGE_KIND = {"job_board": "a job-board page", "news": "a news article", "other": "not a company website"}
+
+
+def _not_company_site(kind: str, company: Optional[str] = None) -> str:
+    about = f" about {company}" if company else ""
+    return f"not the company's own site ({_PAGE_KIND.get(kind, kind)}{about}); add its website with `target`"
 
 
 @dataclass
@@ -112,12 +119,16 @@ class Pipeline:
         status = self.db.status_of(domain)
         if status == "drafted" or (status == "skipped" and not force):
             return Result(domain, "duplicate", f"already {status}")
+        if kind := non_company_kind(urlparse(url).hostname or ""):  # free: no scrape, no LLM call
+            return self._skip(domain, url, source, _not_company_site(kind))
 
         try:
             with trace.timed("scrape"):
                 page = self.scraper.fetch(url)
         except ScrapeError as exc:
             return self._skip(domain, url, source, f"scrape failed: {exc}")
+        if kind := non_company_kind(urlparse(page.url).hostname or ""):  # redirected to a job board
+            return self._skip(domain, url, source, _not_company_site(kind))
         trace.pages, trace.text_chars, trace.truncated = len(page.pages), len(page.text), page.truncated
 
         try:
@@ -130,6 +141,9 @@ class Pipeline:
             usage = self.extractor.usage
             trace.model, trace.llm_calls = self.extractor.model, usage.calls
             trace.input_tokens, trace.output_tokens = usage.input_tokens, usage.output_tokens
+        if company.page_type != "company":  # an article or posting about them, not their site
+            return self._skip(domain, url, source, _not_company_site(company.page_type, company.company_name),
+                              company_name=company.company_name)
         trace.founder_in_text = name_in_text(company.founder_first_name, company.founder_last_name, page.text)
         if trace.founder_in_text is False:  # named from memory, not the page: greet the team instead
             company = company.model_copy(update={"founder_first_name": None, "founder_last_name": None})

@@ -172,6 +172,9 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
   (`ALLOW_GUESSED_EMAILS=1` restores the old behaviour). A founder the model names is only used if the
   site itself names them.
 - **Email copy**: your `projects` paragraph for the company's domain, plus your experience, stack and links.
+- **Wrong pages**: a lead that points at a news article or a job-board posting is skipped, not drafted. Known
+  hosts are skipped before scraping; the model labels the rest. The reason names the company, so you can add
+  its real site with `target`.
 - **Dedupe**: one row per registrable domain, plus a unique index on drafted emails. Drafted and skipped
   companies are never processed again (use `target <url> --force` to retry a skipped one). LLM or Gmail
   outages are not recorded as skips, so those companies are retried next time.

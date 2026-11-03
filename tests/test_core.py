@@ -587,3 +587,36 @@ def test_founder_not_on_the_page_is_not_used(tmp_path: Path):
     pipe.finder.find = lambda domain, company, first, last, mailtos: seen.update(first=first) or real_find()
     r = pipe.process("https://useshiplog.com", "hn")
     assert seen["first"] is None and r.draft.body.startswith("Hi Shiplog team,")
+
+
+def test_non_company_pages_are_skipped(tmp_path: Path):
+    from src.utils import non_company_kind
+
+    assert non_company_kind("axmed.teamtailor.com") == "job_board" and non_company_kind("jobs.acme.com") == "job_board"
+    assert non_company_kind("techcrunch.com") == "news" and non_company_kind("github.com") == "other"
+    assert non_company_kind("useshiplog.com") is None and non_company_kind("teamtailor.com.evil.dev") is None
+    assert parse_job_comment("Acme | Python | Remote <a href='https://techcrunch.com/acme-raises'>x</a>") is None
+
+    pipe = _traced_pipeline(tmp_path, "Ada")
+    fetched = []
+    pipe.scraper.fetch = lambda url: fetched.append(url)
+    r = pipe.process("https://axmed.teamtailor.com/jobs/1-ai-engineer", "hn")
+    assert r.outcome == "skipped" and "job-board page" in r.detail and fetched == []  # no scrape, no LLM
+
+
+def test_model_flagged_article_is_skipped(tmp_path: Path):
+    pipe = _traced_pipeline(tmp_path, "Ada")
+    real = pipe.extractor.extract
+    pipe.extractor.extract = lambda page, hint: real(page, hint).model_copy(update={"page_type": "news"})
+    r = pipe.process("https://some-blog.dev/acme-raises", "hn")
+    assert r.outcome == "skipped" and "a news article about Shiplog" in r.detail
+
+
+def test_eval_scores_wrong_website_catches():
+    from evals.run_evals import score_row, summarize
+
+    label = {"domain": "jobs.example", "right_website": "no", "company_name": "Shiplog", "core_domain": "DevTools",
+             "founder_first_name": "", "founder_last_name": ""}
+    caught = score_row(label, {**_company("DevTools").model_dump(), "page_type": "job_board"}, None)
+    missed = score_row(label, _company("DevTools").model_dump(), None)
+    assert summarize([caught, missed])["wrong_website_caught"] == 50.0

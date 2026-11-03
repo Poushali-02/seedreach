@@ -97,11 +97,12 @@ def score_row(label: dict[str, str], pred: Optional[dict[str, Any]], hook_ok: Op
         ),
         "hook_rule_problems": hook_rule_problems(pred.get("personalized_hook", "")),
         "hook_ok": hook_ok,
+        "flagged_not_company": pred.get("page_type", "company") != "company",
         "pred_domain": pred.get("core_domain"),
         "true_domain": label["core_domain"],
     }
     result["sendable"] = bool(
-        right_site and result["name_ok"] and result["domain_ok"] and result["founder"] == "correct"
+        right_site and not result["flagged_not_company"] and result["name_ok"] and result["domain_ok"] and result["founder"] == "correct"
         and not result["hook_rule_problems"] and hook_ok is not False
     )
     return result
@@ -121,6 +122,9 @@ def summarize(results: list[dict[str, Any]]) -> dict[str, Any]:
         "rows": len(results),
         "failed_calls": len(results) - len(scored),
         "wrong_website_rows": len(scored) - len(on_site),
+        "wrong_website_caught": pct(sum(r["flagged_not_company"] for r in scored if not r["right_website"]),
+                                    len(scored) - len(on_site)),
+        "company_site_flagged": sum(r["flagged_not_company"] for r in on_site),
         "company_name": pct(sum(r["name_ok"] for r in on_site), len(on_site)),
         "core_domain": pct(sum(r["domain_ok"] for r in on_site), len(on_site)),
         "founder_correct": pct(founders["correct"], len(on_site)),
@@ -188,6 +192,8 @@ def print_report(summary: dict[str, Any], title: str) -> None:
         f"  invented founder       {summary['invented_founder']}%",
         f"  hook follows rules     {summary['hook_rules_ok']}%",
         f"  hook grounded (human)  {summary['hook_grounded']}%" if summary["hook_grounded"] is not None else "",
+        f"  wrong website caught   {summary['wrong_website_caught']}%   "
+        f"(company sites wrongly flagged: {summary['company_site_flagged']})",
         f"  READY TO SEND          {summary['sendable']}%",
     ]
     if summary["domain_confusions"]:
