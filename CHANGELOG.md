@@ -5,6 +5,11 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-03
+
+Reach real people: no drafts to blind email guesses or to founders the site doesn't name, shorter
+first emails, and no drafts for news articles or job-board pages.
+
 ### Changed
 - No more drafts to bare guesses. Every address now has a confidence (`verified`, `on site`,
   `pattern from site`, `generic`, `guess`), and a `{first}@domain` guess with nothing behind it is
@@ -95,7 +100,8 @@ First public release.
 - `HEADLESS` mode and a GitHub Actions template for scheduled runs from a private repo.
 - Contributing guide, security policy, issue templates and CI on Python 3.10 and 3.13.
 
-[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/Poushali-02/seedreach/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Poushali-02/seedreach/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Poushali-02/seedreach/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Poushali-02/seedreach/releases/tag/v0.1.0
