@@ -1,0 +1,49 @@
+src/utils.py
+  s_f6512831c46992::t_db46e7fd0cf424 51,82,87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.0.0",
+  "base_commit_sha": "1ebeca930cc634d4607eb572d920c7d7276dfc0f",
+  "branch": "autter-test",
+  "prompts": {
+    "s_f6512831c46992": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "510d9f4b-1fc0-4075-b820-a69d20653cab",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:fc4e7dc0b14d6c28970833a7849dca015d67ebab64aace6552a15dff1be6709a",
+      "total_additions": 5,
+      "total_deletions": 2,
+      "accepted_lines": 105,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_f6512831c46992": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "510d9f4b-1fc0-4075-b820-a69d20653cab",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:fc4e7dc0b14d6c28970833a7849dca015d67ebab64aace6552a15dff1be6709a",
+      "stats": {
+        "total_additions": 5,
+        "total_deletions": 2,
+        "accepted_lines": 105,
+        "overriden_lines": 0,
+        "files": {
+          "src/utils.py": {
+            "total_additions": 5,
+            "total_deletions": 2,
+            "accepted_lines": 105,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  }
+}
