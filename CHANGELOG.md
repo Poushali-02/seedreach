@@ -5,6 +5,12 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+### Changed
+- GitHub Actions in `tests.yml` and the scheduled-runs template are pinned to commit IDs (with the
+  version as a comment), and the template pins `SEEDREACH_REF` to the release's commit instead of its
+  tag. A tag can be moved to different code; a commit can't, and the runner job holds your Gmail token.
+  The template also moves to `actions/checkout` and `actions/setup-python` v7, matching `tests.yml`.
+
 ## [0.3.1] - 2026-11-03
 
 Reach real people: no drafts to blind email guesses or to founders the site doesn't name, shorter
