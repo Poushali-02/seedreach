@@ -5,6 +5,16 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-06
+
+Gemini works again on fresh installs, and the scheduled-runs template runs only pinned code.
+
+### Fixed
+- Every Gemini call failed with `404 NOT_FOUND` on new installs. `google-genai` 3.0.0 (released
+  2026-11-06) changed its default API version from `v1beta` to `v1`, where `gemini-flash-lite-latest`
+  isn't available. `requirements.txt` now caps it at `<3`. If you're stuck on 3.x, set
+  `GOOGLE_GENAI_API_VERSION=v1beta`.
+
 ### Changed
 - GitHub Actions in `tests.yml` and the scheduled-runs template are pinned to commit IDs (with the
   version as a comment), and the template pins `SEEDREACH_REF` to the release's commit instead of its
