@@ -34,8 +34,10 @@ permissions:
 env:
   SEEDREACH_REPO: Poushali-02/seedreach   # the code to run; change if you use a fork
   # Pin to a release you have reviewed, never main: this job holds your Gmail token, so it should only
-  # run code you trust. To upgrade, read the new release, then bump this tag.
-  SEEDREACH_REF: v0.3.1
+  # run code you trust. Use the release's commit ID, not its tag: a tag can be moved, a commit can't.
+  # To upgrade, read the new release, run `git rev-parse vX.Y.Z^{commit}` in seedreach, put the result
+  # here and update the version comment.
+  SEEDREACH_REF: 174d630011cd3b0481a49457fc39627a0dacf8a2 # v0.3.1
 
 jobs:
   run:
@@ -43,19 +45,19 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out saved state (outreach.db)
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: state
           path: state
 
       - name: Check out seedreach
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ env.SEEDREACH_REPO }}
           ref: ${{ env.SEEDREACH_REF }}
           path: app
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.12"
           cache: pip
