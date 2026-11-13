@@ -24,6 +24,7 @@ from src.config import get_settings
 from src.db import Database
 from src.digest import build_digest
 from src.intelligence.extractor import ExtractionError
+from src.notify import build_summary, send_summary
 from src.pipeline import Pipeline, Result
 from src.trace import Trace
 from src.utils import domain_of, linkedin_people_search, normalize_url
@@ -115,6 +116,8 @@ def run(
     if digest is not None:  # written even when empty, so a scheduler can tell "nothing new" from "didn't run"
         digest.write_text(build_digest(results, dry_run=dry_run), encoding="utf-8")
     counts = _summary(results, dry_run)
+    if not dry_run:  # before the exit below, so a failed run still reports
+        send_summary(build_summary(results), get_settings())
     _run_stats(pipe.traces)
     if counts["error"] and not counts["drafted"]:
         raise typer.Exit(1)  # every attempt failed (LLM or Gmail outage): let schedulers flag the run

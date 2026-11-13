@@ -63,6 +63,11 @@ class Settings(BaseSettings):
     # Don't name an internship first posted more than this many days ago (openings often stay listed long
     # after anyone reads applications). 0 turns the limit off. Roles whose board gives no date are kept.
     max_role_age_days: int = 60
+    # Optional run summary after `run` to Telegram and/or Discord (company names and counts only);
+    # unset means no message
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+    discord_webhook_url: str = ""
 
     @field_validator("google_credentials_file", "google_token_file", "db_path")
     @classmethod

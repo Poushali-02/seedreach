@@ -10,3 +10,5 @@ import pytest
 @pytest.fixture(autouse=True)
 def _no_real_api_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("APOLLO_API_KEY", "")
+    for name in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "DISCORD_WEBHOOK_URL"):  # no real run summaries
+        monkeypatch.setenv(name, "")
