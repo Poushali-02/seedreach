@@ -24,7 +24,7 @@ from src.db import Database
 from src.intelligence.extractor import ExtractionError
 from src.pipeline import Pipeline, Result
 from src.trace import Trace
-from src.utils import domain_of, normalize_url
+from src.utils import domain_of, linkedin_people_search, normalize_url
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="Cold-outreach drafts for early-stage startups.")
 console = Console()
@@ -178,11 +178,13 @@ def status(events: int = typer.Option(10, "--events", "-e", help="How many recen
         console.print(table)
     waiting = db.needs_contact(10)
     if waiting:
-        table = Table(title="Needs a contact", caption="Find an address you trust, then: python main.py target <url> --force")
-        for col in ("Domain", "Company", "Founder", "Why"):
+        table = Table(title="Needs a contact", caption="Reach the founder directly (the LinkedIn link searches for "
+                      "them), or find an address you trust, then: python main.py target <url> --force")
+        for col in ("Domain", "Company", "Founder", "Why", "Find them"):
             table.add_column(col)
         for r in waiting:
-            table.add_row(r["domain"], r["company_name"] or "-", r["founder_name"] or "-", r["reason"])
+            find = linkedin_people_search(r["founder_name"], r["company_name"] or "") if r["founder_name"] else "-"
+            table.add_row(r["domain"], r["company_name"] or "-", r["founder_name"] or "-", r["reason"], find)
         console.print(table)
     log_rows = db.recent_events(events)
     if log_rows:

@@ -724,3 +724,49 @@ def test_pipeline_names_an_open_role_from_the_job_board(tmp_path: Path):
     off.scraper, off.boards = pipe.scraper, pipe.boards
     off.settings = Settings(check_job_boards=False)  # switched off: the board isn't read
     assert "opening" not in off.process("https://useshiplog.com", "hn").draft.body and len(seen) == 1
+
+
+# ---- generic inboxes -------------------------------------------------------
+def _inbox_pipeline(tmp_path: Path, name: str, page_text: str, address: str, mode: str = "no_founder"):
+    from types import SimpleNamespace as NS
+    from src.enrichment.email_finder import EmailResult
+
+    (tmp_path / name).mkdir()
+    pipe = _traced_pipeline(tmp_path / name, page_text)
+    pipe.settings = Settings(generic_inbox=mode)
+    pipe.finder = NS(find=lambda *a: EmailResult(address, "mailto", "generic"))
+    return pipe
+
+
+def test_generic_inbox_with_a_named_founder_goes_to_needs_contact(tmp_path: Path):
+    named = "Shiplog was started by Ada."  # the founder is on the page, so the greeting would be "Hi Ada,"
+    pipe = _inbox_pipeline(tmp_path, "named", named, "hello@useshiplog.com")
+    r = pipe.process("https://useshiplog.com", "hn")
+    assert r.outcome == "skipped" and r.detail == (
+        "needs contact: only a generic inbox (hello@useshiplog.com); reach Ada directly")
+    (row,) = pipe.db.needs_contact()
+    assert (row["domain"], row["founder_name"]) == ("useshiplog.com", "Ada")
+
+    # founders@ reaches the founders, so it's still drafted
+    assert _inbox_pipeline(tmp_path, "f", named, "founders@useshiplog.com").process(
+        "https://useshiplog.com", "hn").outcome == "drafted"
+    # "always" restores the old behaviour
+    assert _inbox_pipeline(tmp_path, "a", named, "hello@useshiplog.com", "always").process(
+        "https://useshiplog.com", "hn").outcome == "drafted"
+
+
+def test_generic_inbox_without_a_named_founder(tmp_path: Path):
+    unnamed = "Changelogs for monorepos."  # no founder on the page: "Hi Shiplog team,"
+    drafted = _inbox_pipeline(tmp_path, "d", unnamed, "hello@useshiplog.com").process("https://useshiplog.com", "hn")
+    assert drafted.outcome == "drafted" and drafted.draft.body.startswith("Hi Shiplog team,")
+    never = _inbox_pipeline(tmp_path, "n", unnamed, "hello@useshiplog.com", "never")
+    r = never.process("https://useshiplog.com", "hn")
+    assert r.outcome == "skipped" and r.detail == "needs contact: only a generic inbox (hello@useshiplog.com)"
+
+
+def test_linkedin_people_search_link():
+    from src.utils import linkedin_people_search
+
+    assert linkedin_people_search("Ada Lovelace", "Shiplog, Inc.") == (
+        "https://www.linkedin.com/search/results/people/?keywords=Ada+Lovelace+Shiplog")
+    assert linkedin_people_search("Ada") == "https://www.linkedin.com/search/results/people/?keywords=Ada"
