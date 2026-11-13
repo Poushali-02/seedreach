@@ -67,10 +67,11 @@ class EmailFinder:
     def __init__(self, settings: Settings, client: Optional[httpx.Client] = None) -> None:
         self.settings = settings
         self.client = client or httpx.Client(timeout=settings.http_timeout)
+        self.apollo_enabled = bool(settings.apollo_api_key)  # off for the run once Apollo refuses the key
 
     # ---- providers -----------------------------------------------------
     def _apollo(self, domain: str, company: str, first: str, last: Optional[str]) -> Optional[EmailResult]:
-        if not self.settings.apollo_api_key:
+        if not self.apollo_enabled:
             return None
         payload = {
             "first_name": first, "last_name": last or "", "domain": domain,
@@ -81,6 +82,11 @@ class EmailFinder:
                 APOLLO_URL, json=payload,
                 headers={"X-Api-Key": self.settings.apollo_api_key, "Cache-Control": "no-cache"},
             )
+            if resp.status_code in (401, 403):  # bad key, or the free plan (people/match is paid-only)
+                self.apollo_enabled = False
+                log.warning("Apollo email lookups are off for this run (HTTP %s): %s",
+                            resp.status_code, resp.text[:160])
+                return None
             resp.raise_for_status()
             person = resp.json().get("person") or {}
         except (httpx.HTTPError, ValueError) as exc:

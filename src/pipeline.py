@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 from src.config import Settings
 from src.db import Database
 from src.enrichment.email_finder import EmailFinder, EmailResult
+from src.enrichment.company_facts import CompanyFactsClient
 from src.enrichment.job_boards import JobBoardChecker
 from src.intelligence.extractor import ExtractionError, Extractor
 from src.intelligence.scraper import ScrapeError, Scraper
@@ -86,6 +87,7 @@ class Pipeline:
         self.extractor = Extractor(settings)
         self.finder = EmailFinder(settings)
         self.boards = JobBoardChecker(settings.http_timeout)
+        self.company_facts = CompanyFactsClient(settings.apollo_api_key, settings.http_timeout)
         self.gmail = GmailDraftClient(settings.google_credentials_file, settings.google_token_file, settings.headless)
         if not dry_run:
             self.gmail.ensure_authenticated()  # fail before spending LLM credits
@@ -131,6 +133,14 @@ class Pipeline:
             return Result(domain, "duplicate", f"already {status}")
         if kind := non_company_kind(urlparse(url).hostname or ""):  # free: no scrape, no LLM call
             return self._skip(domain, url, source, _not_company_site(kind))
+        facts = None
+        if self.settings.max_employees and self.company_facts.enabled:  # only with an Apollo key
+            with trace.timed("size"):
+                facts = self.company_facts.lookup(domain)
+        if facts and facts.employees and facts.employees > self.settings.max_employees:
+            return self._skip(domain, url, source,
+                              f"too big: ~{facts.employees} employees (Apollo), over MAX_EMPLOYEES={self.settings.max_employees}")
+        size_note = f"; {facts.summary()}" if facts and facts.summary() else ""
 
         try:
             with trace.timed("scrape"):
@@ -187,7 +197,7 @@ class Pipeline:
             role = best.title if best else None
             if boards.problems:
                 self._record("INFO", domain, f"job boards not read: {', '.join(boards.problems)}")
-        role_note = f"; role: {role}" if role else ""
+        role_note = (f"; role: {role}" if role else "") + size_note
 
         draft = generate_email(company, self.profile, role=role)
         if self.dry_run:

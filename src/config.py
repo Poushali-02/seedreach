@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-haiku-5-5"
     apollo_api_key: str = ""
+    # With an Apollo key: skip companies Apollo says have more than this many employees (before scraping,
+    # so they cost no LLM call). Companies Apollo knows nothing about are kept. 0 turns the check off.
+    max_employees: int = 100
     # USD per million tokens, from your provider's pricing page; 0 shows tokens only (e.g. on a free tier)
     llm_price_input_per_m: float = 0.0
     llm_price_output_per_m: float = 0.0

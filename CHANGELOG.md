@@ -17,7 +17,15 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   "International" don't count as internships, and a board that can't be read never stops the draft.
   `CHECK_JOB_BOARDS=0` turns it off.
 
+- With an Apollo key, companies with more than `MAX_EMPLOYEES` people (100 by default) are skipped
+  before any scraping or LLM call, using Apollo's organization lookup, which the free plan allows.
+  Companies Apollo doesn't know are kept, and each draft shows the stage and size it found ("Seed, ~7
+  people"). Headcount is used rather than funding stage, because Apollo labels Ramp, Vercel and Stripe
+  all "Venture (Round not Specified)".
+
 ### Changed
+- If Apollo refuses the key (a paid-only endpoint on the free plan, or a bad key), seedreach logs it once
+  and stops asking for the rest of the run, instead of failing on every company.
 - No more drafts to `hello@`, `info@`, `contact@` or `team@` when the site names a founder: those
   inboxes rarely reach the founder. The company goes under *Needs a contact* instead, and `status` shows
   the founder with a LinkedIn search link so you can reach them directly. In the scheduled runner's first

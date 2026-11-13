@@ -170,7 +170,13 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
 - **Extraction**: the LLM must return JSON matching a Pydantic schema (company, summary, domain, founder
   name, one-sentence technical hook). Invalid output is retried once, and busy errors are retried with
   backoff. Founder names are only taken if the site states them (About and Team pages are fetched too).
-- **Email finding**, best first: Apollo-verified (if you set a key), the founder's own address on the site,
+- **Company size (optional, with an Apollo key)**: before reading a site, seedreach asks Apollo how many
+  people the company has and skips anything over `MAX_EMPLOYEES` (100 by default), so a large company costs
+  no LLM call. Companies Apollo doesn't know are kept. The funding stage and headcount it finds are shown
+  next to each draft ("Seed, ~7 people"). This uses Apollo's organization lookup, which the free plan
+  allows. `MAX_EMPLOYEES=0` turns it off.
+- **Email finding**, best first: Apollo-verified (if you set a key; this needs a paid Apollo plan, and on
+  the free plan seedreach notices the refusal once and stops asking), the founder's own address on the site,
   the founder's name in the format the site's addresses use (`first.last@`), anyone's address on the site,
   then a generic inbox (`hello@`). A bare `{first}@domain` guess is **not drafted**: the company is listed
   under *Needs a contact* in `status` so you can find an address and retry with `target <url> --force`
