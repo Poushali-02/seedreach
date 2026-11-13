@@ -6,11 +6,16 @@ that can't be read is reported with a reason instead, so "checked, nothing open"
 "couldn't check".
 
 Public APIs (no key):
-  Greenhouse  https://boards-api.greenhouse.io/v1/boards/<token>/jobs        {"jobs": [{"title", "absolute_url"}]}
-  Lever       https://api.lever.co/v0/postings/<site>?mode=json              [{"text", "hostedUrl", "categories"}]
+  Greenhouse  https://boards-api.greenhouse.io/v1/boards/<token>/jobs        {"jobs": [{"title", "absolute_url",
+                                                                                "first_published"}]}
+  Lever       https://api.lever.co/v0/postings/<site>?mode=json              [{"text", "hostedUrl", "categories",
+                                                                               "createdAt"}]
   Ashby       https://api.ashbyhq.com/posting-api/job-board/<name>           {"jobs": [{"title", "jobUrl", "isListed",
-                                                                                "employmentType"}]}
-An unknown board returns 404 on all three. Ashby can also return 200 with no jobs for a name that has
+                                                                                "employmentType", "publishedAt"}]}
+The boards only list open postings, but an opening can stay up for years, so each role keeps the date it was
+first posted: Greenhouse "first_published" (ISO time), Lever "createdAt" (milliseconds since 1970), Ashby
+"publishedAt" (ISO time). Greenhouse's "updated_at" isn't used: it changes for every job whenever the board
+is synced. An unknown board returns 404 on all three. Ashby can also return 200 with no jobs for a name that has
 no board, so an empty Ashby result means "nothing found", not "no internships".
 """
 
@@ -19,6 +24,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
+from datetime import date, datetime, timezone
 from typing import Iterable, Optional
 from urllib.parse import parse_qs, urlparse
 
@@ -71,6 +77,11 @@ class Role:
     title: str
     url: str
     board: str  # Board.label
+    posted: Optional[date] = None  # when the opening was first posted; None if the board doesn't say
+
+
+def _today() -> date:
+    return datetime.now(timezone.utc).date()
 
 
 @dataclass
@@ -78,12 +89,29 @@ class BoardCheck:
     roles: list[Role] = field(default_factory=list)  # internship roles, any discipline
     problems: list[str] = field(default_factory=list)  # e.g. "lever:acme not_found"
 
-    def best_role(self) -> Optional[Role]:
-        """The engineering internship to name in a draft, preferring backend/AI/data; None if there is none."""
-        engineering = [r for r in self.roles if _ENGINEERING.search(r.title)]
-        if not engineering:
+    def best_role(self, max_age_days: int = 0, today: Optional[date] = None) -> Optional[Role]:
+        """The engineering internship to name in a draft, preferring backend/AI/data, then the newest.
+
+        With `max_age_days`, openings first posted longer ago than that are left out (an opening can stay
+        listed long after anyone reads applications). Roles with no posting date are kept. None if no role
+        is left.
+        """
+        candidates = self.recent(self.engineering_roles(), max_age_days, today)
+        if not candidates:
             return None
-        return sorted(engineering, key=lambda r: not _PREFERRED.search(r.title))[0]
+        return sorted(candidates, key=lambda r: (not _PREFERRED.search(r.title),
+                                                 -(r.posted.toordinal() if r.posted else 0)))[0]
+
+    def engineering_roles(self) -> list[Role]:
+        return [r for r in self.roles if _ENGINEERING.search(r.title)]
+
+    @staticmethod
+    def recent(roles: list[Role], max_age_days: int = 0, today: Optional[date] = None) -> list[Role]:
+        """The roles posted within `max_age_days` (0: all of them). Roles with no posting date are kept."""
+        if max_age_days <= 0:
+            return list(roles)
+        today = today or _today()
+        return [r for r in roles if r.posted is None or (today - r.posted).days <= max_age_days]
 
 
 def board_urls_in(html: str) -> list[str]:
@@ -114,6 +142,18 @@ def find_boards(urls: Iterable[str]) -> list[Board]:
     return boards
 
 
+def _posted(value: object) -> Optional[date]:
+    """A posting date from an ISO time ("2026-10-22T11:22:01-04:00") or Lever's epoch milliseconds."""
+    try:
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
+            return datetime.fromtimestamp(value / 1000, timezone.utc).date()
+        if isinstance(value, str) and len(value) >= 10:
+            return date.fromisoformat(value[:10])  # the date as the board wrote it; time and zone don't matter
+    except (ValueError, OverflowError, OSError):
+        pass
+    return None
+
+
 def _is_internship(title: str, *flags: object) -> bool:
     return bool(_INTERN.search(title)) or any(str(f).strip().lower() in {"intern", "internship"} for f in flags)
 
@@ -129,7 +169,8 @@ def _roles_from(board: Board, data: object) -> list[Role]:
             categories = row.get("categories")
             commitment = categories.get("commitment") if isinstance(categories, dict) else ""
             if title and _is_internship(title, commitment):
-                roles.append(Role(title, str(row.get("hostedUrl") or ""), board.label))
+                roles.append(Role(title, str(row.get("hostedUrl") or ""), board.label,
+                                  _posted(row.get("createdAt"))))
         return roles
     rows = data.get("jobs") if isinstance(data, dict) else None
     for row in rows if isinstance(rows, list) else []:
@@ -139,11 +180,11 @@ def _roles_from(board: Board, data: object) -> list[Role]:
         if board.ats == "ashby":
             if row.get("isListed") is False:
                 continue
-            url, flags = row.get("jobUrl"), (row.get("employmentType"),)
+            url, flags, posted = row.get("jobUrl"), (row.get("employmentType"),), row.get("publishedAt")
         else:
-            url, flags = row.get("absolute_url"), ()
+            url, flags, posted = row.get("absolute_url"), (), row.get("first_published")
         if title and _is_internship(title, *flags):
-            roles.append(Role(title, str(url or ""), board.label))
+            roles.append(Role(title, str(url or ""), board.label, _posted(posted)))
     return roles
 
 

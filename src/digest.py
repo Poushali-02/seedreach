@@ -23,6 +23,11 @@ def _size(r: "Result") -> str:
     return f", {r.size}" if r.size else ""
 
 
+def _posted(r: "Result") -> str:
+    d = r.role_posted
+    return f", posted {d.day} {d:%b %Y}" if d else ""
+
+
 def build_digest(results: Iterable["Result"], *, dry_run: bool = False) -> str:
     """Markdown with up to three sections; an empty string when nothing in the run needs you."""
     results = list(results)
@@ -37,7 +42,7 @@ def build_digest(results: Iterable["Result"], *, dry_run: bool = False) -> str:
         lines.append("_Dry run: nothing was saved to Gmail or the database._\n")
     if apply:
         lines.append("### Apply")
-        lines += [f"- {_name(r)}: [{r.role}]({r.apply_url}){_size(r)}" for r in apply]
+        lines += [f"- {_name(r)}: [{r.role}]({r.apply_url}){_posted(r)}{_size(r)}" for r in apply]
         lines.append("")
     if reach:
         lines.append("### Reach the founder on LinkedIn")

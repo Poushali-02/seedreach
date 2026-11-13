@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Callable, Iterator, Optional
 from urllib.parse import urlparse
 
@@ -52,6 +52,7 @@ class Result:
     founder: Optional[str] = None
     role: Optional[str] = None  # an open engineering internship read from its job board
     apply_url: Optional[str] = None
+    role_posted: Optional[date] = None  # when that opening was first posted, if the board says
     size: str = ""  # e.g. "Seed, ~7 people" (Apollo)
 
 
@@ -206,17 +207,22 @@ class Pipeline:
 
         # an open internship matters most when there's no good address to write to, so read the job
         # board before the email checks: skipped companies keep their apply link too
-        role = apply_url = None
+        role = apply_url = role_posted = None
         if page.job_boards and self.settings.check_job_boards:
             with trace.timed("jobs"):
                 boards = self.boards.check(page.job_boards)
-            best = boards.best_role()
+            max_age = self.settings.max_role_age_days
+            best = boards.best_role(max_age)
             if best:
-                role, apply_url = best.title, best.url or None
+                role, apply_url, role_posted = best.title, best.url or None, best.posted
+            engineering = boards.engineering_roles()
+            stale = len(engineering) - len(boards.recent(engineering, max_age))
+            if stale:
+                self._record("INFO", domain, f"{stale} internship(s) posted over {max_age} days ago not named")
             if boards.problems:
                 self._record("INFO", domain, f"job boards not read: {', '.join(boards.problems)}")
         about = dict(company=company.company_name, founder=founder, role=role, apply_url=apply_url,
-                     size=facts.summary() if facts else "")
+                     role_posted=role_posted, size=facts.summary() if facts else "")
 
         def skip(reason: str) -> Result:
             result = self._skip(domain, url, source, reason, company_name=company.company_name, founder_name=founder)
@@ -238,7 +244,8 @@ class Pipeline:
         if self.db.email_taken(email.email):
             return skip(f"email {email.email} already drafted")
 
-        role_note = (f"; role: {role}" if role else "") + size_note
+        posted_note = f", posted {role_posted}" if role and role_posted else ""
+        role_note = (f"; role: {role}" if role else "") + posted_note + size_note
         draft = generate_email(company, self.profile, role=role)
         if self.dry_run:
             return Result(domain, "drafted", f"dry run ({email.source}: {email.confidence}){role_note}",

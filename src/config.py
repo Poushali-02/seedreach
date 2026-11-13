@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     generic_inbox: Literal["always", "no_founder", "never"] = "no_founder"
     # Read the company's public Greenhouse/Lever/Ashby board for open internships and name one in the draft
     check_job_boards: bool = True
+    # Don't name an internship first posted more than this many days ago (openings often stay listed long
+    # after anyone reads applications). 0 turns the limit off. Roles whose board gives no date are kept.
+    max_role_age_days: int = 60
 
     @field_validator("google_credentials_file", "google_token_file", "db_path")
     @classmethod

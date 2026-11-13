@@ -198,6 +198,11 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
   page read, or on its careers page), seedreach reads the board and, when an engineering, AI or data
   internship is open, names it in the draft ("I saw your Backend Engineering Intern opening."). Other
   internships, such as finance or sales, aren't mentioned. Set `CHECK_JOB_BOARDS=0` to turn this off.
+  Boards only list open postings, but an opening can stay up for months or years after anyone reads
+  applications, so internships first posted more than 60 days ago (`MAX_ROLE_AGE_DAYS`, 0 for no limit)
+  aren't named. Among the rest the newest wins, and the digest shows when it was posted. A role whose
+  board gives no date is kept. "Open" means the company hasn't taken the posting down, not that it's
+  still reading applications.
 - **Email copy**: short by default (about 100–130 words): the opener, who you are, the first sentence of your
   project for the company's domain, one ask and two links. `"email_style": "long"` adds your role pitch, every
   matching project, experience, stack, closing and all links.
