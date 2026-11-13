@@ -25,11 +25,28 @@ def _is_remote_friendly(company: dict[str, Any]) -> bool:
     return any("remote" in str(r).lower() for r in company.get("regions") or [])
 
 
-def select_companies(companies: list[dict[str, Any]], max_team_size: int) -> list[dict[str, Any]]:
-    """Active, hiring, small companies with a website: remote-friendly first, then newest launches."""
+def parse_regions(raw: str) -> set[str]:
+    """`"India, Remote"` -> {"india", "remote"}. Empty entries are ignored."""
+    return {r.strip().lower() for r in raw.split(",") if r.strip()}
+
+
+def _region_names(company: dict[str, Any]) -> set[str]:
+    return {str(r).strip().lower() for r in company.get("regions") or []}
+
+
+def select_companies(
+    companies: list[dict[str, Any]], max_team_size: int, regions: Optional[set[str]] = None
+) -> list[dict[str, Any]]:
+    """Active, hiring, small companies with a website: remote-friendly first, then newest launches.
+
+    With `regions`, keep only companies that list at least one of them. Names are matched whole
+    (case-insensitive), so "remote" doesn't also match YC's separate "Partly Remote" region.
+    """
     picked = []
     for c in companies:
         if c.get("status") != "Active" or not c.get("isHiring") or not c.get("website"):
+            continue
+        if regions and not regions & _region_names(c):
             continue
         size = c.get("team_size")
         if isinstance(size, int):
@@ -58,7 +75,12 @@ class YCDirectoryProvider(BaseSourcingProvider):
             log.warning("YC directory unavailable: %s", exc)
             return
 
-        for c in select_companies(companies, self.settings.yc_max_team_size):
+        regions = parse_regions(self.settings.yc_regions)
+        unknown = regions - {name for c in companies for name in _region_names(c)}
+        if unknown:  # most likely a typo: YC's names are e.g. "India", "Remote", "America / Canada"
+            log.warning("YC_REGIONS: no hiring YC company lists %s; check the spelling",
+                        ", ".join(sorted(unknown)))
+        for c in select_companies(companies, self.settings.yc_max_team_size, regions):
             batch = c.get("batch") or "YC"
             yield Lead(
                 url=c["website"],
