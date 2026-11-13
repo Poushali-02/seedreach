@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Callable, Iterator, Optional
 from urllib.parse import urlparse
@@ -47,6 +47,12 @@ class Result:
     detail: str
     draft: Optional[EmailDraft] = None
     to: Optional[str] = None
+    # what we learned about the company, for the run digest (see src/digest.py)
+    company: Optional[str] = None
+    founder: Optional[str] = None
+    role: Optional[str] = None  # an open engineering internship read from its job board
+    apply_url: Optional[str] = None
+    size: str = ""  # e.g. "Seed, ~7 people" (Apollo)
 
 
 def build_providers(settings: Settings, names: str = "all") -> list[BaseSourcingProvider]:
@@ -169,40 +175,46 @@ class Pipeline:
             company = company.model_copy(update={"founder_first_name": None, "founder_last_name": None})
 
         founder = " ".join(p for p in (company.founder_first_name, company.founder_last_name) if p) or None
+
+        # an open internship matters most when there's no good address to write to, so read the job
+        # board before the email checks: skipped companies keep their apply link too
+        role = apply_url = None
+        if page.job_boards and self.settings.check_job_boards:
+            with trace.timed("jobs"):
+                boards = self.boards.check(page.job_boards)
+            best = boards.best_role()
+            if best:
+                role, apply_url = best.title, best.url or None
+            if boards.problems:
+                self._record("INFO", domain, f"job boards not read: {', '.join(boards.problems)}")
+        about = dict(company=company.company_name, founder=founder, role=role, apply_url=apply_url,
+                     size=facts.summary() if facts else "")
+
+        def skip(reason: str) -> Result:
+            result = self._skip(domain, url, source, reason, company_name=company.company_name, founder_name=founder)
+            return replace(result, **about)
+
         with trace.timed("email"):
             email = self.finder.find(
                 page.domain, company.company_name, company.founder_first_name,
                 company.founder_last_name, page.mailtos,
             )
         if email is None:
-            return self._skip(domain, url, source, "no founder email found",
-                              company_name=company.company_name, founder_name=founder)
+            return skip("no founder email found")
         trace.email_source = f"{email.source} ({email.confidence})"
         if email.is_guess and not self.settings.allow_guessed_emails:
-            return self._skip(domain, url, source, f"{NEEDS_CONTACT}: guessed {email.email}, not verified",
-                              company_name=company.company_name, founder_name=founder)
+            return skip(f"{NEEDS_CONTACT}: guessed {email.email}, not verified")
         if self._generic_only(email, founder):
             reach = f"; reach {founder} directly" if founder else ""
-            return self._skip(domain, url, source, f"{NEEDS_CONTACT}: only a generic inbox ({email.email}){reach}",
-                              company_name=company.company_name, founder_name=founder)
+            return skip(f"{NEEDS_CONTACT}: only a generic inbox ({email.email}){reach}")
         if self.db.email_taken(email.email):
-            return self._skip(domain, url, source, f"email {email.email} already drafted",
-                              company_name=company.company_name, founder_name=founder)
+            return skip(f"email {email.email} already drafted")
 
-        role = None
-        if page.job_boards and self.settings.check_job_boards:
-            with trace.timed("jobs"):
-                boards = self.boards.check(page.job_boards)
-            best = boards.best_role()
-            role = best.title if best else None
-            if boards.problems:
-                self._record("INFO", domain, f"job boards not read: {', '.join(boards.problems)}")
         role_note = (f"; role: {role}" if role else "") + size_note
-
         draft = generate_email(company, self.profile, role=role)
         if self.dry_run:
             return Result(domain, "drafted", f"dry run ({email.source}: {email.confidence}){role_note}",
-                          draft, email.email)
+                          draft, email.email, **about)
 
         try:
             with trace.timed("draft"):
@@ -216,7 +228,8 @@ class Pipeline:
             founder_email=email.email, email_source=f"{email.source} ({email.confidence})", draft_id=draft_id,
         )
         self._record("INFO", domain, f"drafted to {email.email} via {email.source}{role_note}")
-        return Result(domain, "drafted", f"{email.source}: {email.confidence}{role_note}", draft, email.email)
+        return Result(domain, "drafted", f"{email.source}: {email.confidence}{role_note}", draft, email.email,
+                      **about)
 
     def run(self, limit: int, source: str = "all", on_result: Optional[Reporter] = None) -> list[Result]:
         """Process queued targets first, then fresh leads, until `limit` drafts exist."""

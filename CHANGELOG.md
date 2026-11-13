@@ -23,6 +23,13 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   people"). Headcount is used rather than funding stage, because Apollo labels Ramp, Vercel and Stripe
   all "Venture (Round not Specified)".
 
+- `run --digest FILE` writes a short Markdown summary of the run: open internships with apply links,
+  founders to reach on LinkedIn when only a generic or guessed address was found, and drafts to review.
+  It holds no email addresses. The scheduled-runs template posts it as a comment on an issue titled
+  "seedreach: apply and reach out" and @-mentions you, so it reaches your phone through the GitHub app
+  (the workflow now needs `issues: write`). Companies skipped for lack of a good address keep their apply
+  link: the job board is now read before the email checks.
+
 ### Changed
 - If Apollo refuses the key (a paid-only endpoint on the free plan, or a bad key), seedreach logs it once
   and stops asking for the rest of the run, instead of failing on every company.

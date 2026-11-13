@@ -853,3 +853,66 @@ def test_apollo_email_lookup_stops_after_the_plan_refuses_it(caplog, monkeypatch
     assert first.email == "ada@x.com" and first.confidence == "on site"  # falls back to the site
     assert len(calls) == 1 and not finder.apollo_enabled
     assert sum("Apollo email lookups are off" in m for m in caplog.messages) == 1
+
+
+# ---- run digest (phone summary) --------------------------------------------
+def test_digest_lists_roles_founders_and_drafts_without_email_addresses():
+    from src.digest import build_digest
+    from src.pipeline import Result
+
+    results = [
+        Result("ramp.com", "drafted", "mailto: on site; role: SWE Intern", to="ada@ramp.com", company="Ramp",
+               role="Software Engineering Intern, Backend", apply_url="https://jobs.ashbyhq.com/ramp/1",
+               size="Seed, ~7 people"),
+        Result("acme.dev", "skipped", "needs contact: only a generic inbox (hello@acme.dev); reach Ada directly",
+               company="Acme", founder="Ada Lovelace", role="AI Intern", apply_url="https://jobs.lever.co/acme/2"),
+        Result("news.com", "skipped", "not the company's own site"),
+        Result("down.dev", "error", "extraction failed"),
+    ]
+    text = build_digest(results)
+    assert "### Apply" in text and "- **Ramp** (ramp.com): [Software Engineering Intern, Backend](" \
+        "https://jobs.ashbyhq.com/ramp/1), Seed, ~7 people" in text
+    assert "- **Acme** (acme.dev): [AI Intern](https://jobs.lever.co/acme/2)" in text  # skipped, but can apply
+    assert "### Reach the founder on LinkedIn" in text and "Ada Lovelace, [find on LinkedIn](" \
+        "https://www.linkedin.com/search/results/people/?keywords=Ada+Lovelace+Acme)" in text
+    assert "### Drafts to review in Gmail" in text and "- **Ramp** (ramp.com): Software Engineering Intern" in text
+    assert "@" not in text and "news.com" not in text and "down.dev" not in text
+    assert build_digest([Result("news.com", "skipped", "not the company's own site")]) == ""
+    assert build_digest(results[:1], dry_run=True).startswith("_Dry run")
+
+
+def test_skipped_companies_keep_their_open_role_for_the_digest(tmp_path: Path):
+    from types import SimpleNamespace as NS
+    from src.enrichment.email_finder import EmailResult
+    from src.enrichment.job_boards import Board, BoardCheck, Role
+    from src.intelligence.scraper import ScrapedPage
+
+    pipe = _traced_pipeline(tmp_path, "Shiplog was started by Ada.")
+    pipe.scraper = NS(fetch=lambda url: ScrapedPage(url=url, domain="useshiplog.com",
+                                                    text="Shiplog was started by Ada.", pages=[url],
+                                                    job_boards=[Board("ashby", "shiplog")]))
+    pipe.boards = NS(check=lambda boards: BoardCheck(roles=[Role("Backend Intern", "https://jobs.ashbyhq.com/s/1", "x")]))
+    pipe.finder = NS(find=lambda *a: EmailResult("hello@useshiplog.com", "mailto", "generic"))  # generic: skipped
+    r = pipe.process("https://useshiplog.com", "hn")
+    assert r.outcome == "skipped" and r.detail.startswith("needs contact")
+    assert (r.company, r.founder, r.role, r.apply_url) == (
+        "Shiplog", "Ada", "Backend Intern", "https://jobs.ashbyhq.com/s/1")
+
+
+def test_run_writes_the_digest_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from types import SimpleNamespace as NS
+    from typer.testing import CliRunner
+    import main
+    from src.pipeline import Result
+
+    found = [Result("ramp.com", "drafted", "ok", company="Ramp", role="Backend Intern",
+                    apply_url="https://jobs.ashbyhq.com/ramp/1")]
+    monkeypatch.setattr(main, "_pipeline", lambda db, dry_run: NS(run=lambda *a, **k: found, traces=[]))
+    monkeypatch.setattr(main, "_db", lambda: None)
+    out = tmp_path / "digest.md"
+    assert CliRunner().invoke(main.app, ["run", "--dry-run", "--digest", str(out)]).exit_code == 0
+    assert "[Backend Intern](https://jobs.ashbyhq.com/ramp/1)" in out.read_text(encoding="utf-8")
+
+    found.clear()  # nothing for you: the file is still written, but empty
+    assert CliRunner().invoke(main.app, ["run", "--dry-run", "--digest", str(out)]).exit_code == 0
+    assert out.read_text(encoding="utf-8") == ""

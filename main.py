@@ -11,6 +11,7 @@ Drafts are only ever saved to Gmail Drafts; nothing is sent automatically.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -21,6 +22,7 @@ from rich.table import Table
 
 from src.config import get_settings
 from src.db import Database
+from src.digest import build_digest
 from src.intelligence.extractor import ExtractionError
 from src.pipeline import Pipeline, Result
 from src.trace import Trace
@@ -100,6 +102,8 @@ def run(
     limit: int = typer.Option(5, "--limit", "-n", min=1, help="Stop after this many drafts."),
     source: str = typer.Option("all", "--source", "-s", help="all | yc | launchhn | hn | producthunt"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print drafts; skip Gmail and don't touch the database."),
+    digest: Optional[Path] = typer.Option(None, "--digest", help="Also write a short Markdown summary here: roles "
+                                          "to apply for, founders to reach, drafts to review (no email addresses)."),
 ) -> None:
     """Fetch new leads, enrich them, and save drafts to Gmail."""
     pipe = _pipeline(_db(), dry_run)
@@ -108,6 +112,8 @@ def run(
     except ValueError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(2)
+    if digest is not None:  # written even when empty, so a scheduler can tell "nothing new" from "didn't run"
+        digest.write_text(build_digest(results, dry_run=dry_run), encoding="utf-8")
     counts = _summary(results, dry_run)
     _run_stats(pipe.traces)
     if counts["error"] and not counts["drafted"]:
