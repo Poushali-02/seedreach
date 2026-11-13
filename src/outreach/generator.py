@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Optional
 
 from src.intelligence.extractor import CompanyProfile
 from src.profile import Profile
@@ -42,24 +43,36 @@ def _links(profile: Profile, limit: int) -> list[str]:
     return [f"{label}: {value}" for label, value in labelled if value][:limit]
 
 
-def _short(company: CompanyProfile, profile: Profile, name: str, greeting: str) -> list[str]:
+def _role_line(role: Optional[str]) -> str:
+    """'I saw your Backend Intern opening.' for a role read from the company's job board, else ''."""
+    if not role:
+        return ""
+    title = re.sub(r"\s+", " ", strip_markdown(role)).strip()
+    if len(title) > 90:
+        title = title[:90].rsplit(" ", 1)[0]
+    return f"I saw your {title} opening." if title else ""
+
+
+def _short(company: CompanyProfile, profile: Profile, name: str, greeting: str, role: str) -> list[str]:
     proof = _first_sentence(profile.projects_for(company.core_domain)[0])
+    ask = (profile.ask or DEFAULT_ASK).replace("{company}", name)
     return [
         greeting,
         company.personalized_hook,
         f"I'm {profile.first_name}, {profile.intro.rstrip('.')}. {proof}",
-        (profile.ask or DEFAULT_ASK).replace("{company}", name),
+        f"{role} {ask}" if role else ask,
         "\n".join(_links(profile, 2)),
         f"Best,\n{profile.name}",
     ]
 
 
-def _long(company: CompanyProfile, profile: Profile, name: str, greeting: str) -> list[str]:
+def _long(company: CompanyProfile, profile: Profile, name: str, greeting: str, role: str) -> list[str]:
     signature = "\n".join(filter(None, [profile.name, profile.phone]))
+    pitch = f"I'm {profile.first_name}, {profile.intro}, and I'd love to join {name} as {profile.role_pitch}"
     return [
         greeting,
         company.personalized_hook,
-        f"I'm {profile.first_name}, {profile.intro}, and I'd love to join {name} as {profile.role_pitch}",
+        f"{role} {pitch}" if role else pitch,
         "\n\n".join(profile.projects_for(company.core_domain)),
         f"{profile.experience} My core stack is {profile.stack}.",
         profile.closing,
@@ -68,11 +81,13 @@ def _long(company: CompanyProfile, profile: Profile, name: str, greeting: str) -
     ]
 
 
-def generate_email(company: CompanyProfile, profile: Profile) -> EmailDraft:
+def generate_email(company: CompanyProfile, profile: Profile, role: Optional[str] = None) -> EmailDraft:
+    """`role`: an open internship read from the company's job board, named in the draft when given."""
     name = display_name(company.company_name)
     first = strip_markdown(company.founder_first_name) if company.founder_first_name else ""
     greeting = f"Hi {first}," if first else f"Hi {name} team,"
-    sections = (_long if profile.email_style == "long" else _short)(company, profile, name, greeting)
+    style = _long if profile.email_style == "long" else _short
+    sections = style(company, profile, name, greeting, _role_line(role))
     body = "\n\n".join(s for s in sections if s) + "\n"
     subject = profile.subject.replace("{company}", name)
     _assert_plain_text(body)

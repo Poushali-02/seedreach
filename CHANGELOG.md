@@ -10,6 +10,12 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   `YC_REGIONS=India,Remote` (#35). Names match YC's own region names whole and ignore case, so `Remote`
   doesn't also pick up `Partly Remote`. A name no company uses is logged as a warning. Empty (the
   default) keeps every region, as before.
+- Drafts name an open internship when the company has one (#13). If the site links to a public Greenhouse,
+  Lever or Ashby job board (on the pages already read, or once on its careers page), seedreach reads the
+  board's public API and names an engineering, AI or data internship in the draft: "I saw your Backend
+  Engineering Intern opening." Finance or sales internships aren't mentioned, "Internal Tools" and
+  "International" don't count as internships, and a board that can't be read never stops the draft.
+  `CHECK_JOB_BOARDS=0` turns it off.
 
 ## [0.3.2] - 2026-11-06
 

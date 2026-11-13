@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 from src.config import Settings
 from src.db import Database
 from src.enrichment.email_finder import EmailFinder
+from src.enrichment.job_boards import JobBoardChecker
 from src.intelligence.extractor import ExtractionError, Extractor
 from src.intelligence.scraper import ScrapeError, Scraper
 from src.outreach.generator import EmailDraft, generate_email
@@ -83,6 +84,7 @@ class Pipeline:
         self.scraper = Scraper(settings)
         self.extractor = Extractor(settings)
         self.finder = EmailFinder(settings)
+        self.boards = JobBoardChecker(settings.http_timeout)
         self.gmail = GmailDraftClient(settings.google_credentials_file, settings.google_token_file, settings.headless)
         if not dry_run:
             self.gmail.ensure_authenticated()  # fail before spending LLM credits
@@ -165,9 +167,20 @@ class Pipeline:
             return self._skip(domain, url, source, f"email {email.email} already drafted",
                               company_name=company.company_name, founder_name=founder)
 
-        draft = generate_email(company, self.profile)
+        role = None
+        if page.job_boards and self.settings.check_job_boards:
+            with trace.timed("jobs"):
+                boards = self.boards.check(page.job_boards)
+            best = boards.best_role()
+            role = best.title if best else None
+            if boards.problems:
+                self._record("INFO", domain, f"job boards not read: {', '.join(boards.problems)}")
+        role_note = f"; role: {role}" if role else ""
+
+        draft = generate_email(company, self.profile, role=role)
         if self.dry_run:
-            return Result(domain, "drafted", f"dry run ({email.source}: {email.confidence})", draft, email.email)
+            return Result(domain, "drafted", f"dry run ({email.source}: {email.confidence}){role_note}",
+                          draft, email.email)
 
         try:
             with trace.timed("draft"):
@@ -180,8 +193,8 @@ class Pipeline:
             domain, url, source, company_name=company.company_name, founder_name=founder,
             founder_email=email.email, email_source=f"{email.source} ({email.confidence})", draft_id=draft_id,
         )
-        self._record("INFO", domain, f"drafted to {email.email} via {email.source}")
-        return Result(domain, "drafted", f"{email.source}: {email.confidence}", draft, email.email)
+        self._record("INFO", domain, f"drafted to {email.email} via {email.source}{role_note}")
+        return Result(domain, "drafted", f"{email.source}: {email.confidence}{role_note}", draft, email.email)
 
     def run(self, limit: int, source: str = "all", on_result: Optional[Reporter] = None) -> list[Result]:
         """Process queued targets first, then fresh leads, until `limit` drafts exist."""

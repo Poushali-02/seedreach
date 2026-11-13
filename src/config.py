@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     headless: bool = False  # set on servers/CI: never open a browser for Gmail sign-in
     allow_guessed_emails: bool = False  # draft to {first}@domain guesses with no evidence (most bounce or go unread)
+    # Read the company's public Greenhouse/Lever/Ashby board for open internships and name one in the draft
+    check_job_boards: bool = True
 
     @field_validator("google_credentials_file", "google_token_file", "db_path")
     @classmethod
