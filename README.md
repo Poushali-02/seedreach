@@ -136,6 +136,7 @@ python main.py run --limit 10 --dry-run
 # Real run: saves drafts to Gmail and records each company so it is never drafted twice
 python main.py run --limit 5
 python main.py run --limit 5 --source yc          # all | yc | launchhn | hn | producthunt
+python main.py run --limit 5 --digest digest.md   # also write a short summary: roles to apply for, founders to reach
 
 # Queue your own list; the next `run` processes these before sourced leads
 python main.py add-target site1.com site2.io
@@ -282,6 +283,12 @@ running `main` or a tag. The job holds your Gmail token, so it should only ever 
 and a tag can be moved to different code while a commit can't. The GitHub Actions it uses are pinned by
 commit too. To upgrade, read the new release's notes, get its commit with `git rev-parse vX.Y.Z^{commit}`,
 put that in `SEEDREACH_REF`, push, and do a dry run.
+
+**On your phone:** each run posts a short digest as a comment on one issue in the runner repo, titled
+*seedreach: apply and reach out*, and @-mentions you, so the GitHub mobile app notifies you. It lists open
+internships with apply links, founders to reach on LinkedIn (when only a generic or guessed address was
+found) and drafts to review. It has company names and links only, never email addresses. Nothing to report
+means no comment.
 
 Control: change the `cron:` line for timing, use **Run workflow** for an on-demand run with its own
 limit and source, and **Disable workflow** to pause. GitHub emails you when a run fails (for example,

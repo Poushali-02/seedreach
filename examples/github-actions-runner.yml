@@ -30,6 +30,7 @@ concurrency:
 
 permissions:
   contents: write                  # to commit the updated database to the state branch
+  issues: write                    # to post each run's digest on an issue (see "Post the digest")
 
 env:
   SEEDREACH_REPO: Poushali-02/seedreach   # the code to run; change if you use a fork
@@ -90,7 +91,29 @@ jobs:
           LIMIT: ${{ inputs.limit || '5' }}
           SOURCE: ${{ inputs.source || 'all' }}
           DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
-        run: python main.py run --limit "$LIMIT" --source "$SOURCE" $DRY_RUN
+        run: python main.py run --limit "$LIMIT" --source "$SOURCE" $DRY_RUN --digest "$GITHUB_WORKSPACE/digest.md"
+
+      # Comments on one issue, "seedreach: apply and reach out", and @-mentions you, so the GitHub mobile app
+      # notifies you: roles to apply for, founders to reach on LinkedIn, drafts to review. No email addresses.
+      - name: Post the digest
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+          RUN: ${{ github.run_number }}
+        run: |
+          f="$GITHUB_WORKSPACE/digest.md"
+          if [ ! -s "$f" ]; then echo "Nothing new for you in this run."; exit 0; fi
+          title="seedreach: apply and reach out"
+          n=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" \
+                --json number --jq '.[0].number // empty')
+          if [ -z "$n" ]; then
+            url=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+                    --body "Each scheduled run comments here with roles to apply for, founders to reach and drafts to review.")
+            n="${url##*/}"
+          fi
+          { echo "@$OWNER, run $RUN:"; echo; cat "$f"; } > "$RUNNER_TEMP/comment.md"
+          gh issue comment "$n" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/comment.md"
 
       - name: Save state
         if: ${{ always() && !inputs.dry_run }}

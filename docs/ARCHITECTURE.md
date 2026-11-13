@@ -63,6 +63,7 @@ python main.py run --limit 5
 | `src/db.py` | SQLite: companies, statuses, event log, dedupe, run traces |
 | `src/trace.py` | `Trace`: one company's run, step by step (time, tokens, pages read, text cut, founder on the page) |
 | `src/pipeline.py` | Orchestration, source registry (`build_providers`), `interleave` |
+| `src/digest.py` | The run digest (`run --digest`): roles to apply for, founders to reach, drafts to review |
 | `src/sourcing/` | Lead sources: one module per source |
 | `src/intelligence/` | `scraper.py` (HTML to text) and `extractor.py` (LLM to `CompanyProfile`) |
 | `src/enrichment/` | `email_finder.py`, `job_boards.py` (open internships on public job boards) and `company_facts.py` (company size from Apollo) |
