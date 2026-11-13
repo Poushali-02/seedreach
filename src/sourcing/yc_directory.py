@@ -13,7 +13,7 @@ from typing import Any, Iterator, Optional
 import httpx
 
 from src.config import Settings
-from src.sourcing.base import BaseSourcingProvider, Lead
+from src.sourcing.base import BaseSourcingProvider, Lead, parse_preferences, region_rank
 from src.utils import strip_markdown
 
 log = logging.getLogger(__name__)
@@ -35,12 +35,15 @@ def _region_names(company: dict[str, Any]) -> set[str]:
 
 
 def select_companies(
-    companies: list[dict[str, Any]], max_team_size: int, regions: Optional[set[str]] = None
+    companies: list[dict[str, Any]], max_team_size: int, regions: Optional[set[str]] = None,
+    prefer: tuple[str, ...] = (),
 ) -> list[dict[str, Any]]:
     """Active, hiring, small companies with a website: remote-friendly first, then newest launches.
 
     With `regions`, keep only companies that list at least one of them. Names are matched whole
     (case-insensitive), so "remote" doesn't also match YC's separate "Partly Remote" region.
+    With `prefer` (see parse_preferences), companies listing the first preferred region come first,
+    then the second, and so on, then the rest; the usual order applies within each group.
     """
     picked = []
     for c in companies:
@@ -55,7 +58,8 @@ def select_companies(
         elif c.get("stage") != "Early":  # unknown size: only keep if YC marks it early-stage
             continue
         picked.append(c)
-    picked.sort(key=lambda c: (not _is_remote_friendly(c), -(c.get("launched_at") or 0)))
+    picked.sort(key=lambda c: (region_rank(c.get("regions") or [], prefer),
+                               not _is_remote_friendly(c), -(c.get("launched_at") or 0)))
     return picked
 
 
@@ -76,15 +80,19 @@ class YCDirectoryProvider(BaseSourcingProvider):
             return
 
         regions = parse_regions(self.settings.yc_regions)
-        unknown = regions - {name for c in companies for name in _region_names(c)}
-        if unknown:  # most likely a typo: YC's names are e.g. "India", "Remote", "America / Canada"
-            log.warning("YC_REGIONS: no hiring YC company lists %s; check the spelling",
-                        ", ".join(sorted(unknown)))
-        for c in select_companies(companies, self.settings.yc_max_team_size, regions):
+        prefer = parse_preferences(self.settings.prefer_regions)
+        known = {name for c in companies for name in _region_names(c)}
+        for setting, names in (("YC_REGIONS", regions), ("PREFER_REGIONS", set(prefer))):
+            unknown = names - known
+            if unknown:  # most likely a typo: YC's names are e.g. "India", "Remote", "America / Canada"
+                log.warning("%s: no hiring YC company lists %s; check the spelling",
+                            setting, ", ".join(sorted(unknown)))
+        for c in select_companies(companies, self.settings.yc_max_team_size, regions, prefer):
             batch = c.get("batch") or "YC"
             yield Lead(
                 url=c["website"],
                 source=self.name,
                 name_hint=strip_markdown(c.get("name") or "")[:80] or None,
                 context=strip_markdown(f"{batch}: {c.get('one_liner') or ''}")[:300],
+                regions=tuple(str(r) for r in c.get("regions") or []),
             )

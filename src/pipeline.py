@@ -18,7 +18,7 @@ from src.intelligence.scraper import ScrapeError, Scraper
 from src.outreach.generator import EmailDraft, generate_email
 from src.outreach.gmail_client import GmailDraftClient, GmailError
 from src.profile import load_profile
-from src.sourcing.base import BaseSourcingProvider, Lead
+from src.sourcing.base import BaseSourcingProvider, Lead, parse_preferences, region_rank
 from src.sourcing.hacker_news import HackerNewsProvider
 from src.sourcing.launch_hn import LaunchHNProvider
 from src.sourcing.product_hunt import ProductHuntProvider
@@ -79,6 +79,34 @@ def interleave(streams: list[Iterator[Lead]]) -> Iterator[Lead]:
                 active.remove(stream)
             else:
                 yield lead
+
+
+def ranked_interleave(streams: list[Iterator[Lead]], rank: Callable[[Lead], int]) -> Iterator[Lead]:
+    """Like interleave, but always take the best-ranked lead (lowest rank) waiting at the front of a source.
+
+    Sources take turns among equally ranked leads. Each source should yield its best leads first (the
+    YC provider sorts by the same preference); only one lead per source is read ahead, so it stays lazy.
+    """
+    heads: list[tuple[Iterator[Lead], Lead]] = []
+    for stream in streams:
+        lead = next(stream, None)
+        if lead is not None:
+            heads.append((stream, lead))
+    turn = 0
+    while heads:
+        best = min(rank(lead) for _, lead in heads)
+        order = list(range(turn, len(heads))) + list(range(turn))
+        i = next(i for i in order if rank(heads[i][1]) == best)
+        stream, lead = heads[i]
+        yield lead
+        following = next(stream, None)
+        if following is None:
+            heads.pop(i)
+            turn = i
+        else:
+            heads[i] = (stream, following)
+            turn = i + 1
+        turn = turn % len(heads) if heads else 0
 
 
 class Pipeline:
@@ -255,7 +283,11 @@ class Pipeline:
             handle(row["url"], row["source"], None)
 
         seen: set[str] = set()  # dry runs record nothing, so also dedupe within this run
-        for lead in interleave([p.iter_leads() for p in build_providers(self.settings, source)]):
+        streams = [p.iter_leads() for p in build_providers(self.settings, source)]
+        prefer = parse_preferences(self.settings.prefer_regions)
+        leads = (ranked_interleave(streams, lambda lead: region_rank(lead.regions, prefer))
+                 if prefer else interleave(streams))
+        for lead in leads:
             if drafted >= limit or attempts >= max_attempts:
                 return results
             try:

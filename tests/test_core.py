@@ -436,6 +436,95 @@ def test_run_mixes_sources_and_skips_repeats(tmp_path: Path, monkeypatch: pytest
     assert processed == [("yc", "https://a.dev"), ("yc", "https://b.dev"), ("hn", "https://c.dev")]
 
 
+
+def test_region_preferences_parse_and_rank():
+    from src.sourcing.base import parse_preferences, region_rank
+
+    prefer = parse_preferences(" India , Remote,,india")
+    assert prefer == ("india", "remote")
+    assert region_rank(["South Asia", "India"], prefer) == 0
+    assert region_rank(["Remote", "India"], prefer) == 0  # the best match counts
+    assert region_rank(["America / Canada", "Remote"], prefer) == 1
+    assert region_rank(["Partly Remote"], prefer) == 2  # whole names only
+    assert region_rank([], prefer) == 2
+    assert region_rank(["India"], ()) == 0
+
+
+def test_yc_prefer_regions_ranks_without_dropping():
+    from src.sourcing.yc_directory import YCDirectoryProvider
+
+    base = {"status": "Active", "isHiring": True, "team_size": 5}
+    data = [
+        {**base, "name": "SF", "website": "https://s.dev", "regions": ["America / Canada"], "launched_at": 900},
+        {**base, "name": "Anywhere", "website": "https://a.dev", "regions": ["Remote"], "launched_at": 500},
+        {**base, "name": "Bengaluru", "website": "https://b.dev", "regions": ["India"], "launched_at": 100},
+        {**base, "name": "Delhi", "website": "https://d.dev", "regions": ["India", "Remote"], "launched_at": 200},
+    ]
+    client = type("C", (), {"get": lambda self, url: _FakeResponse(data)})()
+    leads = YCDirectoryProvider(Settings(prefer_regions="India,Remote"), client=client).fetch(10)
+    # India first (newest first within it), then Remote, then the rest; nothing dropped
+    assert [l.name_hint for l in leads] == ["Delhi", "Bengaluru", "Anywhere", "SF"]
+    assert leads[0].regions == ("India", "Remote")
+    # without a preference, the old order: remote-friendly first, then newest
+    plain = YCDirectoryProvider(Settings(), client=client).fetch(10)
+    assert [l.name_hint for l in plain] == ["Anywhere", "Delhi", "SF", "Bengaluru"]
+
+
+def test_ranked_interleave_takes_preferred_leads_first_and_stays_lazy():
+    from src.pipeline import ranked_interleave
+    from src.sourcing.base import Lead, parse_preferences, region_rank
+
+    def stream(name, regions_list):
+        for i, regions in enumerate(regions_list):
+            read.append(f"{name}{i}")
+            yield Lead(url=f"https://{name}{i}.dev", source=name, regions=regions)
+
+    read: list[str] = []
+    prefer = parse_preferences("India,Remote")
+    streams = [
+        stream("yc", [("India",), ("India",), ("Remote",), ()]),
+        stream("hn", [("Remote",), ("Remote",)]),
+        stream("ph", [(), ()]),
+    ]
+    leads = ranked_interleave(streams, lambda lead: region_rank(lead.regions, prefer))
+    first = next(leads)
+    assert first.url == "https://yc0.dev"
+    assert read == ["yc0", "hn0", "ph0"]  # one lead read ahead per source, no more
+    order = [first.url] + [l.url for l in leads]
+    assert [u.split("//")[1].split(".")[0] for u in order] == [
+        "yc0", "yc1",           # India
+        "hn0", "yc2", "hn1",    # Remote: sources take turns (yc just had two)
+        "ph0", "yc3", "ph1",    # the rest
+    ]
+
+
+def test_run_ranks_sources_only_when_prefer_regions_is_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    import src.pipeline as pipeline
+    from src.sourcing.base import BaseSourcingProvider, Lead
+
+    def source(name, leads):
+        class P(BaseSourcingProvider):
+            def iter_leads(self):
+                return (Lead(url=u, source=name, regions=r) for u, r in leads)
+        P.name = name
+        return P()
+
+    def run(settings):
+        providers = [source("hn", [("https://h.dev", ("Remote",))]),
+                     source("yc", [("https://i.dev", ("India",)), ("https://u.dev", ())])]
+        monkeypatch.setattr(pipeline, "build_providers", lambda settings, src: providers)
+        pipe = pipeline.Pipeline.__new__(pipeline.Pipeline)
+        pipe.settings, pipe.db, pipe.dry_run = settings, Database(tmp_path / f"{id(settings)}.db"), True
+        processed = []
+        pipe.process = lambda url, src, hint=None, force=False: processed.append(url) or pipeline.Result(
+            domain_of(url), "skipped", "x")
+        pipe.run(limit=5)
+        return processed
+
+    assert run(Settings()) == ["https://h.dev", "https://i.dev", "https://u.dev"]
+    assert run(Settings(prefer_regions="India,Remote")) == ["https://i.dev", "https://h.dev", "https://u.dev"]
+
+
 # ---- CLI ---------------------------------------------------------------
 def test_cli_starts_and_lists_commands():
     # Imported here so a broken main.py (e.g. a SyntaxError) fails this test by name.

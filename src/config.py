@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     # YC directory: only companies listing one of these regions, comma-separated (e.g. "India,Remote").
     # Names must match YC's own region names exactly (case doesn't matter). Empty means every region.
     yc_regions: str = ""
+    # Rank leads from every source by region, comma-separated, most wanted first (e.g. "India,Remote"):
+    # companies listing the first come first, then the second, then the rest. Nothing is dropped. Only
+    # YC lists regions; HN's roles count as "Remote"; Launch HN and Product Hunt leads count as "the rest".
+    prefer_regions: str = ""
     log_level: str = "INFO"
     headless: bool = False  # set on servers/CI: never open a browser for Gmail sign-in
     allow_guessed_emails: bool = False  # draft to {first}@domain guesses with no evidence (most bounce or go unread)
