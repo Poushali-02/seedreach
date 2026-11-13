@@ -90,6 +90,10 @@ jobs:
           APOLLO_API_KEY: ${{ secrets.APOLLO_API_KEY }}
           YC_REGIONS: ${{ vars.YC_REGIONS }}            # optional repo variables, e.g. India,Remote
           PREFER_REGIONS: ${{ vars.PREFER_REGIONS }}
+          # Optional run summary (company names and counts only); unset secrets mean no message
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           LIMIT: ${{ inputs.limit || '5' }}
           SOURCE: ${{ inputs.source || 'all' }}
           DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}

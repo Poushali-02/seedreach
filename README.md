@@ -302,6 +302,10 @@ internships with apply links, founders to reach on LinkedIn (when only a generic
 found) and drafts to review. It has company names and links only, never email addresses. Nothing to report
 means no comment.
 
+For a one-line summary on Telegram or Discord as well ("3 new drafts: HillStar, Alter · 2 skipped"), add
+the secrets `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, and/or `DISCORD_WEBHOOK_URL`. It lists company
+names and counts only, never founder addresses or draft text.
+
 Control: change the `cron:` line for timing, use **Run workflow** for an on-demand run with its own
 limit and source, and **Disable workflow** to pause. GitHub emails you when a run fails (for example,
 a Gmail token that needs renewing: the run fails fast with `HEADLESS` in the error, never hangs).
