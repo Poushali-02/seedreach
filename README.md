@@ -202,6 +202,9 @@ Model: `gemini-flash-lite-latest`, 3 runs, 2026-11-01.
 The opening lines in this run haven't been checked by hand yet (the last check found every claim true in
 93% of them), so "ready to send" counts only the rule checks and is a little high.
 
+These numbers predate v0.3.1, which stopped drafting for news articles and job-board pages (3 of the 30
+leads pointed at one). They'll be re-measured for v0.4.0.
+
 How it got here, on the same 30 startups:
 
 | Change | Founder correct | Invented founder | Ready to send |
@@ -214,8 +217,8 @@ Known gaps, each the subject of a follow-up:
 
 - **Board members**: one site lists a real co-founder only under "Board of Directors", and the model
   sometimes names him anyway.
-- **Wrong websites**: 3 of the 30 leads pointed at a news article or a job board, and seedreach drafted
-  for them anyway.
+- **Company fit**: real runs still draft to companies that are past the early stage or don't make
+  software at all (for example, a mobile-MRI service). Fixes are planned in [#2](https://github.com/Poushali-02/seedreach/issues/2) and [#46](https://github.com/Poushali-02/seedreach/issues/46).
 - **Domains**: reading more pages made the domain slightly less accurate and less stable; consumer and
   health companies are sometimes filed as B2B SaaS or AI Agents.
 
