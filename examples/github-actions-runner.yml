@@ -88,6 +88,8 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           APOLLO_API_KEY: ${{ secrets.APOLLO_API_KEY }}
+          YC_REGIONS: ${{ vars.YC_REGIONS }}            # optional repo variables, e.g. India,Remote
+          PREFER_REGIONS: ${{ vars.PREFER_REGIONS }}
           LIMIT: ${{ inputs.limit || '5' }}
           SOURCE: ${{ inputs.source || 'all' }}
           DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}

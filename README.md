@@ -162,6 +162,11 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
   (`LAUNCHHN_LOOKBACK_DAYS`), using the company link from the post.
 - **Mixing** (`all`, the default): sources take turns, so one run draws on all of them, and no company is
   processed twice in a run.
+- **Ranking by region** (`PREFER_REGIONS`, off by default): list regions most wanted first, for example
+  `PREFER_REGIONS=India,Remote`. Companies listing the first come first, then the second, then the rest;
+  nothing is dropped (use `YC_REGIONS` to drop). Only YC lists regions, using the names above; Hacker News
+  roles are remote-only, so they count as `Remote`; Launch HN and Product Hunt leads count as the rest.
+  A YC company listing both `India` and `Remote` ranks as `India`.
 - **Hacker News** (`hn`): finds the latest two "Ask HN: Who is hiring?" threads, then searches their comments for
   remote roles mentioning backend, Python, AI/ML, intern, forward-deployed or systems. Links to job boards
   are ignored; only the company's own site is used. (The `whoishiring` account only posts the thread, so
@@ -275,7 +280,9 @@ It must be private: Actions logs and the database contain founder email addresse
    gh secret set PROFILE_JSON      -R you/seedreach-runner < profile.json
    gh secret set GEMINI_API_KEY    -R you/seedreach-runner      # paste the key when prompted
    ```
-   Optional: `ANTHROPIC_API_KEY`, `APOLLO_API_KEY`, and repo variables `LLM_PROVIDER` / `GEMINI_MODEL`.
+   Optional: `ANTHROPIC_API_KEY`, `APOLLO_API_KEY`, and repo variables `LLM_PROVIDER` / `GEMINI_MODEL` /
+   `YC_REGIONS` / `PREFER_REGIONS` (for example `gh variable set PREFER_REGIONS -R you/seedreach-runner
+   --body "India,Remote"`).
 5. **Test it:** Actions tab > seedreach > Run workflow, with "dry run" ticked.
 
 The template pins `SEEDREACH_REF` to a release's commit ID (with the version as a comment) rather than

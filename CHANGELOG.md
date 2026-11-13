@@ -23,6 +23,13 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   people"). Headcount is used rather than funding stage, because Apollo labels Ramp, Vercel and Stripe
   all "Venture (Round not Specified)".
 
+- `PREFER_REGIONS` ranks leads from every source by region, most wanted first, for example
+  `PREFER_REGIONS=India,Remote` (#35): companies listing India come first, then remote ones, then the
+  rest. Nothing is dropped. YC companies carry their YC regions, Hacker News roles count as `Remote`
+  (that source only keeps remote roles), and Launch HN and Product Hunt leads count as the rest. Empty
+  (the default) keeps the old order. The scheduled-runs template passes `YC_REGIONS` and
+  `PREFER_REGIONS` from repository variables.
+
 - `run --digest FILE` writes a short Markdown summary of the run: open internships with apply links,
   founders to reach on LinkedIn when only a generic or guessed address was found, and drafts to review.
   It holds no email addresses. The scheduled-runs template posts it as a comment on an issue titled
