@@ -342,6 +342,45 @@ def test_yc_selects_small_active_hiring_remote_first():
     assert picked == ["Remote", "New", "Old"]
 
 
+def test_yc_regions_match_whole_names_case_insensitively():
+    from src.sourcing.yc_directory import parse_regions, select_companies
+
+    assert parse_regions(" India , Remote,,") == {"india", "remote"}
+    assert parse_regions("") == set()
+
+    base = {"status": "Active", "isHiring": True, "team_size": 5, "launched_at": 1}
+    companies = [
+        {**base, "name": "Bengaluru", "website": "https://b.dev", "regions": ["India", "South Asia"]},
+        {**base, "name": "Anywhere", "website": "https://a.dev", "regions": ["Remote", "Partly Remote"]},
+        {**base, "name": "Hybrid", "website": "https://h.dev", "regions": ["Partly Remote"]},
+        {**base, "name": "SF", "website": "https://s.dev", "regions": ["America / Canada"]},
+        {**base, "name": "NoRegion", "website": "https://n.dev"},
+    ]
+
+    def names(regions):
+        return sorted(c["name"] for c in select_companies(companies, 25, regions))
+
+    assert names(parse_regions("India,Remote")) == ["Anywhere", "Bengaluru"]  # "Partly Remote" isn't "Remote"
+    assert names(parse_regions("partly remote")) == ["Anywhere", "Hybrid"]
+    assert names(set()) == names(None) == ["Anywhere", "Bengaluru", "Hybrid", "NoRegion", "SF"]
+
+
+def test_yc_provider_filters_by_region_and_warns_on_unknown_names(caplog):
+    from src.sourcing.yc_directory import YCDirectoryProvider
+
+    base = {"status": "Active", "isHiring": True, "team_size": 4}
+    data = [
+        {**base, "name": "Desi", "website": "https://desi.dev", "regions": ["India", "South Asia"]},
+        {**base, "name": "Yank", "website": "https://yank.dev", "regions": ["United States of America"]},
+    ]
+    client = type("C", (), {"get": lambda self, url: _FakeResponse(data)})()
+    with caplog.at_level("WARNING"):
+        leads = YCDirectoryProvider(Settings(yc_regions="India, Indai"), client=client).fetch(5)
+    assert [l.name_hint for l in leads] == ["Desi"]
+    warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+    assert warnings == ["YC_REGIONS: no hiring YC company lists indai; check the spelling"]
+
+
 def test_yc_provider_yields_leads_and_tolerates_outages():
     import httpx
     from src.sourcing.yc_directory import YCDirectoryProvider

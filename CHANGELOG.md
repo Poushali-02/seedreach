@@ -5,6 +5,12 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+### Added
+- `YC_REGIONS` keeps only YC companies that list one of the given regions, for example
+  `YC_REGIONS=India,Remote` (#35). Names match YC's own region names whole and ignore case, so `Remote`
+  doesn't also pick up `Partly Remote`. A name no company uses is logged as a warning. Empty (the
+  default) keeps every region, as before.
+
 ## [0.3.2] - 2026-11-06
 
 Gemini works again on fresh installs, and the scheduled-runs template runs only pinned code.

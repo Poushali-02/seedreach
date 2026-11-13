@@ -154,6 +154,9 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
 - **YC directory** (`yc`): Y Combinator companies marked as hiring, active and small (25 people or fewer,
   `YC_MAX_TEAM_SIZE`), remote-friendly ones first, then the newest batches. Data comes from the
   community-maintained [yc-oss](https://github.com/yc-oss/api) mirror of YC's public directory.
+  To keep only some regions, set `YC_REGIONS`, for example `YC_REGIONS=India,Remote`. Use YC's own
+  region names: `India`, `South Asia`, `Remote`, `Fully Remote`, `Partly Remote`, `America / Canada`,
+  `Europe` and so on. A name that no company uses is reported as a warning, so typos don't go unnoticed.
 - **Launch HN** (`launchhn`): startups announcing their launch on Hacker News in the last 120 days
   (`LAUNCHHN_LOOKBACK_DAYS`), using the company link from the post.
 - **Mixing** (`all`, the default): sources take turns, so one run draws on all of them, and no company is

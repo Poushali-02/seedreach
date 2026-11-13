@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     hn_lookback_days: int = 62
     launchhn_lookback_days: int = 120
     yc_max_team_size: int = 25  # YC directory: skip companies larger than this
+    # YC directory: only companies listing one of these regions, comma-separated (e.g. "India,Remote").
+    # Names must match YC's own region names exactly (case doesn't matter). Empty means every region.
+    yc_regions: str = ""
     log_level: str = "INFO"
     headless: bool = False  # set on servers/CI: never open a browser for Gmail sign-in
     allow_guessed_emails: bool = False  # draft to {first}@domain guesses with no evidence (most bounce or go unread)
