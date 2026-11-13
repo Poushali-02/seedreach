@@ -5,7 +5,18 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-13
+
+The right companies: Indian and remote startups first, open internships with fresh apply links, no
+drafts to generic inboxes when there's a founder to reach, and a digest of each run on your phone.
+
 ### Added
+- `PREFER_REGIONS` ranks leads from every source by region, most wanted first, for example
+  `PREFER_REGIONS=India,Remote` (#35): companies listing India come first, then remote ones, then the
+  rest. Nothing is dropped. YC companies carry their YC regions, Hacker News roles count as `Remote`
+  (that source only keeps remote roles), and Launch HN and Product Hunt leads count as the rest. Empty
+  (the default) keeps the old order. The scheduled-runs template passes `YC_REGIONS` and
+  `PREFER_REGIONS` from repository variables.
 - `YC_REGIONS` keeps only YC companies that list one of the given regions, for example
   `YC_REGIONS=India,Remote` (#35). Names match YC's own region names whole and ignore case, so `Remote`
   doesn't also pick up `Partly Remote`. A name no company uses is logged as a warning. Empty (the
@@ -16,37 +27,27 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   Engineering Intern opening." Finance or sales internships aren't mentioned, "Internal Tools" and
   "International" don't count as internships, and a board that can't be read never stops the draft.
   `CHECK_JOB_BOARDS=0` turns it off.
-
-- With an Apollo key, companies with more than `MAX_EMPLOYEES` people (100 by default) are skipped
-  before any scraping or LLM call, using Apollo's organization lookup, which the free plan allows.
-  Companies Apollo doesn't know are kept, and each draft shows the stage and size it found ("Seed, ~7
-  people"). Headcount is used rather than funding stage, because Apollo labels Ramp, Vercel and Stripe
-  all "Venture (Round not Specified)".
-
 - Internships first posted more than 60 days ago aren't named (`MAX_ROLE_AGE_DAYS`, 0 for no limit).
   Job boards list every posting the company hasn't taken down, and some stay up for years: Palantir's
   Lever board still lists openings from 2024. seedreach now reads each posting's date (Greenhouse
   `first_published`, Lever `createdAt`, Ashby `publishedAt`), prefers the newest, and shows the date in
   the digest and the run log. A role whose board gives no date is kept.
-
-- `PREFER_REGIONS` ranks leads from every source by region, most wanted first, for example
-  `PREFER_REGIONS=India,Remote` (#35): companies listing India come first, then remote ones, then the
-  rest. Nothing is dropped. YC companies carry their YC regions, Hacker News roles count as `Remote`
-  (that source only keeps remote roles), and Launch HN and Product Hunt leads count as the rest. Empty
-  (the default) keeps the old order. The scheduled-runs template passes `YC_REGIONS` and
-  `PREFER_REGIONS` from repository variables.
-
 - `run --digest FILE` writes a short Markdown summary of the run: open internships with apply links,
   founders to reach on LinkedIn when only a generic or guessed address was found, and drafts to review.
   It holds no email addresses. The scheduled-runs template posts it as a comment on an issue titled
   "seedreach: apply and reach out" and @-mentions you, so it reaches your phone through the GitHub app
   (the workflow now needs `issues: write`). Companies skipped for lack of a good address keep their apply
   link: the job board is now read before the email checks.
-
 - Optional run summary to Telegram and/or Discord after `run` ("3 new drafts: HillStar, Alter, Rhem Labs
-  · 2 skipped"), so scheduled runs are easy to review later (#19). Set `TELEGRAM_BOT_TOKEN` and
-  `TELEGRAM_CHAT_ID`, or `DISCORD_WEBHOOK_URL`. It lists company names and counts only, never founder
-  addresses, draft text or skip reasons. Not sent on `--dry-run`; a failed send only logs a warning.
+  · 2 skipped"), so scheduled runs are easy to review later (#19, by @musmanghani13). Set
+  `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, or `DISCORD_WEBHOOK_URL`. It lists company names and counts
+  only, never founder addresses, draft text or skip reasons. Not sent on `--dry-run`; a failed send only
+  logs a warning.
+- With an Apollo key, companies with more than `MAX_EMPLOYEES` people (100 by default) are skipped
+  before any scraping or LLM call, using Apollo's organization lookup, which the free plan allows.
+  Companies Apollo doesn't know are kept, and each draft shows the stage and size it found ("Seed, ~7
+  people"). Headcount is used rather than funding stage, because Apollo labels Ramp, Vercel and Stripe
+  all "Venture (Round not Specified)".
 
 ### Changed
 - If Apollo refuses the key (a paid-only endpoint on the free plan, or a bad key), seedreach logs it once
@@ -57,6 +58,8 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   108 drafts, 41% went to such generic inboxes. Without a named founder the generic inbox is still drafted,
   and `founders@` always counts as the founders' own. `GENERIC_INBOX=always` restores the old behaviour;
   `GENERIC_INBOX=never` never drafts to one.
+- Tests no longer read your `.env` or shell settings, so a personal setting such as `PREFER_REGIONS`
+  can't make them fail locally.
 
 ## [0.3.2] - 2026-11-06
 
@@ -169,7 +172,9 @@ First public release.
 - `HEADLESS` mode and a GitHub Actions template for scheduled runs from a private repo.
 - Contributing guide, security policy, issue templates and CI on Python 3.10 and 3.13.
 
-[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Poushali-02/seedreach/compare/v0.3.2...v0.4.0
+[0.3.2]: https://github.com/Poushali-02/seedreach/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/Poushali-02/seedreach/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Poushali-02/seedreach/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Poushali-02/seedreach/compare/v0.1.0...v0.2.0
