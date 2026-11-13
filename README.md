@@ -176,6 +176,10 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
   under *Needs a contact* in `status` so you can find an address and retry with `target <url> --force`
   (`ALLOW_GUESSED_EMAILS=1` restores the old behaviour). A founder the model names is only used if the
   site itself names them.
+- **Open internships**: if the company's site links to a public Greenhouse, Lever or Ashby job board (on any
+  page read, or on its careers page), seedreach reads the board and, when an engineering, AI or data
+  internship is open, names it in the draft ("I saw your Backend Engineering Intern opening."). Other
+  internships, such as finance or sales, aren't mentioned. Set `CHECK_JOB_BOARDS=0` to turn this off.
 - **Email copy**: short by default (about 100–130 words): the opener, who you are, the first sentence of your
   project for the company's domain, one ask and two links. `"email_style": "long"` adds your role pitch, every
   matching project, experience, stack, closing and all links.

@@ -680,3 +680,47 @@ def test_eval_scores_wrong_website_catches():
     caught = score_row(label, {**_company("DevTools").model_dump(), "page_type": "job_board"}, None)
     missed = score_row(label, _company("DevTools").model_dump(), None)
     assert summarize([caught, missed])["wrong_website_caught"] == 50.0
+
+
+# ---- job boards in the draft (#13) -----------------------------------------
+def test_draft_names_the_role_before_the_ask_and_stays_short():
+    from src.outreach.generator import DEFAULT_ASK
+
+    ask = DEFAULT_ASK.replace("{company}", "Shiplog")
+    body = generate_email(_company("DevTools"), PROFILE, role="Software Engineering Intern, Backend").body
+    assert f"I saw your Software Engineering Intern, Backend opening. {ask}" in body
+    assert len(body.split()) <= 140
+    assert "opening" not in generate_email(_company("DevTools"), PROFILE).body  # no role, no mention
+    long = generate_email(_company("DevTools"), LONG, role="AI Intern").body
+    assert "I saw your AI Intern opening. I'm " in long
+    messy = generate_email(_company("DevTools"), PROFILE, role="  **ML**   Intern\n(Remote) ").body
+    assert "I saw your ML Intern (Remote) opening." in messy  # still plain text
+
+
+def test_pipeline_names_an_open_role_from_the_job_board(tmp_path: Path):
+    from types import SimpleNamespace as NS
+    from src.enrichment.job_boards import Board, BoardCheck, Role
+    from src.intelligence.scraper import ScrapedPage
+
+    pipe = _traced_pipeline(tmp_path, "Shiplog was started by Ada.")
+    pipe.scraper = NS(fetch=lambda url: ScrapedPage(
+        url=url, domain="useshiplog.com", text="Shiplog was started by Ada.", pages=[url],
+        job_boards=[Board("ashby", "shiplog")]))
+    seen = []
+
+    def check(boards):
+        seen.append(boards)
+        return BoardCheck(roles=[Role("Finance Intern", "u1", "ashby:shiplog"),
+                                 Role("Backend Engineering Intern", "u2", "ashby:shiplog")])
+    pipe.boards = NS(check=check)
+
+    result = pipe.process("https://useshiplog.com", "hn")
+    assert result.outcome == "drafted" and result.detail.endswith("; role: Backend Engineering Intern")
+    assert "I saw your Backend Engineering Intern opening." in result.draft.body
+    assert seen == [[Board("ashby", "shiplog")]] and "jobs" in pipe.traces[0].ms
+
+    (tmp_path / "off").mkdir()
+    off = _traced_pipeline(tmp_path / "off", "Shiplog was started by Ada.")
+    off.scraper, off.boards = pipe.scraper, pipe.boards
+    off.settings = Settings(check_job_boards=False)  # switched off: the board isn't read
+    assert "opening" not in off.process("https://useshiplog.com", "hn").draft.body and len(seen) == 1

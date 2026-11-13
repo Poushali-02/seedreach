@@ -31,9 +31,12 @@ python main.py run --limit 5
       site, the founder's name in the site's address format, anyone's address on the site, a generic
       inbox (`src/enrichment/email_finder.py`). A bare `{first}@domain` guess is recorded as
       "needs contact" instead of drafted, unless `ALLOW_GUESSED_EMAILS` is set.
-   5. Writes a plain-text draft from your `profile.json`, choosing the project paragraph that matches
+   5. If the site links to a Greenhouse, Lever or Ashby job board, reads it for open internships and
+      picks an engineering, AI or data one to name in the draft (`src/enrichment/job_boards.py`).
+      A board that can't be read is logged with a reason and never stops the draft.
+   6. Writes a plain-text draft from your `profile.json`, choosing the project paragraph that matches
       the company's domain (`src/outreach/generator.py`).
-   6. Saves it to Gmail Drafts (`src/outreach/gmail_client.py`) and records it in SQLite (`src/db.py`).
+   7. Saves it to Gmail Drafts (`src/outreach/gmail_client.py`) and records it in SQLite (`src/db.py`).
 3. The run stops after `--limit` drafts, or after `limit × 6` attempts to cap LLM spend.
 
 ### What gets recorded
@@ -59,9 +62,9 @@ python main.py run --limit 5
 | `src/pipeline.py` | Orchestration, source registry (`build_providers`), `interleave` |
 | `src/sourcing/` | Lead sources: one module per source |
 | `src/intelligence/` | `scraper.py` (HTML to text) and `extractor.py` (LLM to `CompanyProfile`) |
-| `src/enrichment/` | `email_finder.py` |
+| `src/enrichment/` | `email_finder.py` and `job_boards.py` (open internships on public job boards) |
 | `src/outreach/` | `generator.py` (email text) and `gmail_client.py` (drafts only) |
-| `tests/test_core.py` | Tests; every network and LLM call is faked |
+| `tests/test_core.py`, `tests/test_job_boards.py` | Tests; every network and LLM call is faked (job-board fixtures are recorded real responses) |
 
 ## Adding a lead source
 
