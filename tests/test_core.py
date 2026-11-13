@@ -574,6 +574,7 @@ def _traced_pipeline(tmp_path: Path, founder_text: str):
     pipe.extractor = FakeExtractor()
     pipe.finder = NS(find=lambda *a: EmailResult("ada@useshiplog.com", "heuristic", "pattern from site"))
     pipe.gmail = NS(create_draft=lambda *a: "draft-1")
+    pipe.company_facts = NS(enabled=False, lookup=lambda domain: None)  # no Apollo key
     return pipe
 
 
@@ -770,3 +771,85 @@ def test_linkedin_people_search_link():
     assert linkedin_people_search("Ada Lovelace", "Shiplog, Inc.") == (
         "https://www.linkedin.com/search/results/people/?keywords=Ada+Lovelace+Shiplog")
     assert linkedin_people_search("Ada") == "https://www.linkedin.com/search/results/people/?keywords=Ada"
+
+
+# ---- company size from Apollo ---------------------------------------------
+def _apollo_client(handler):
+    import httpx
+    from src.enrichment.company_facts import CompanyFactsClient
+
+    return CompanyFactsClient("test-key", client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+
+def test_company_facts_reads_apollo_and_turns_off_when_refused(caplog):
+    import httpx
+
+    # trimmed from real Apollo responses (2026-11-13): a 7-person seed startup and a large company
+    orgs = {
+        "context.dev": {"organization": {"estimated_num_employees": 7, "latest_funding_stage": "Seed",
+                                         "total_funding_printed": "9.1M", "founded_year": 2025}},
+        "stripe.com": {"organization": {"estimated_num_employees": 9400,
+                                        "latest_funding_stage": "Venture (Round not Specified)"}},
+        "lim.run": {"organization": {}},  # Apollo knows nothing
+    }
+    client = _apollo_client(lambda r: httpx.Response(200, json=orgs[r.url.params["domain"]]))
+    seed = client.lookup("context.dev")
+    assert (seed.employees, seed.funding_stage, seed.summary()) == (7, "Seed", "Seed, ~7 people")
+    assert client.lookup("stripe.com").employees == 9400
+    assert client.lookup("lim.run") is None
+
+    calls = []
+
+    def refuse(request):
+        calls.append(request)
+        return httpx.Response(403, json={"error": "not included in your Free plan", "error_code": "API_INACCESSIBLE"})
+    blocked = _apollo_client(refuse)
+    with caplog.at_level("WARNING"):
+        assert blocked.lookup("a.dev") is None and blocked.lookup("b.dev") is None
+    assert len(calls) == 1 and not blocked.enabled  # asked once, then stopped for the run
+    assert sum("Apollo company lookups are off" in m for m in caplog.messages) == 1
+
+
+def test_pipeline_skips_companies_apollo_says_are_too_big(tmp_path: Path):
+    from types import SimpleNamespace as NS
+    from src.enrichment.company_facts import CompanyFacts
+
+    pipe = _traced_pipeline(tmp_path, "Shiplog was started by Ada.")
+    sizes = {"useshiplog.com": CompanyFacts(employees=7, funding_stage="Seed"),
+             "stripe.com": CompanyFacts(employees=9400)}
+    pipe.company_facts = NS(enabled=True, lookup=lambda domain: sizes.get(domain))
+    scraped = []
+    real_fetch = pipe.scraper.fetch
+    pipe.scraper = NS(fetch=lambda url: scraped.append(url) or real_fetch(url))
+
+    big = pipe.process("https://stripe.com", "hn")
+    assert big.outcome == "skipped" and big.detail == "too big: ~9400 employees (Apollo), over MAX_EMPLOYEES=100"
+    assert scraped == []  # skipped before scraping: no page fetched, no LLM call
+
+    small = pipe.process("https://useshiplog.com", "hn")
+    assert small.outcome == "drafted" and small.detail.endswith("; Seed, ~7 people")
+    assert "size" in pipe.traces[-1].ms
+
+    (tmp_path / "off").mkdir()
+    off = _traced_pipeline(tmp_path / "off", "Shiplog was started by Ada.")
+    off.company_facts = NS(enabled=True, lookup=lambda domain: sizes.get(domain))
+    off.settings = Settings(max_employees=0)  # check turned off: even a big company goes ahead
+    assert off.process("https://stripe.com", "hn").outcome != "skipped"
+
+
+def test_apollo_email_lookup_stops_after_the_plan_refuses_it(caplog, monkeypatch: pytest.MonkeyPatch):
+    import httpx
+
+    calls = []
+
+    def refuse(request):
+        calls.append(request)
+        return httpx.Response(403, json={"error": "The api/v1/people/match API is not included in your Free plan"})
+    monkeypatch.setattr(email_finder, "has_mx", lambda d: True)
+    finder = EmailFinder(Settings(apollo_api_key="test-key"), client=httpx.Client(transport=httpx.MockTransport(refuse)))
+    with caplog.at_level("WARNING"):
+        first = finder.find("x.com", "X", "Ada", "Lovelace", ["ada@x.com"])
+        finder.find("y.com", "Y", "Bob", None, ["bob@y.com"])
+    assert first.email == "ada@x.com" and first.confidence == "on site"  # falls back to the site
+    assert len(calls) == 1 and not finder.apollo_enabled
+    assert sum("Apollo email lookups are off" in m for m in caplog.messages) == 1
