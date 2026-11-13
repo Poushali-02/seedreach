@@ -17,6 +17,14 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   "International" don't count as internships, and a board that can't be read never stops the draft.
   `CHECK_JOB_BOARDS=0` turns it off.
 
+### Changed
+- No more drafts to `hello@`, `info@`, `contact@` or `team@` when the site names a founder: those
+  inboxes rarely reach the founder. The company goes under *Needs a contact* instead, and `status` shows
+  the founder with a LinkedIn search link so you can reach them directly. In the scheduled runner's first
+  108 drafts, 41% went to such generic inboxes. Without a named founder the generic inbox is still drafted,
+  and `founders@` always counts as the founders' own. `GENERIC_INBOX=always` restores the old behaviour;
+  `GENERIC_INBOX=never` never drafts to one.
+
 ## [0.3.2] - 2026-11-06
 
 Gemini works again on fresh installs, and the scheduled-runs template runs only pinned code.

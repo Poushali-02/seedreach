@@ -30,7 +30,8 @@ python main.py run --limit 5
    4. Finds an email, best first: Apollo-verified (if configured), the founder's own address on the
       site, the founder's name in the site's address format, anyone's address on the site, a generic
       inbox (`src/enrichment/email_finder.py`). A bare `{first}@domain` guess is recorded as
-      "needs contact" instead of drafted, unless `ALLOW_GUESSED_EMAILS` is set.
+      "needs contact" instead of drafted, unless `ALLOW_GUESSED_EMAILS` is set. So is a generic inbox
+      (`hello@`, `info@`) when the site names a founder, unless `GENERIC_INBOX` says otherwise.
    5. If the site links to a Greenhouse, Lever or Ashby job board, reads it for open internships and
       picks an engineering, AI or data one to name in the draft (`src/enrichment/job_boards.py`).
       A board that can't be read is logged with a reason and never stops the draft.

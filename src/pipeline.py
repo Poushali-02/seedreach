@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 from src.config import Settings
 from src.db import Database
-from src.enrichment.email_finder import EmailFinder
+from src.enrichment.email_finder import EmailFinder, EmailResult
 from src.enrichment.job_boards import JobBoardChecker
 from src.intelligence.extractor import ExtractionError, Extractor
 from src.intelligence.scraper import ScrapeError, Scraper
@@ -30,6 +30,7 @@ log = logging.getLogger(__name__)
 # Outcomes: drafted | skipped (recorded, never retried) | duplicate (already known) | error (not recorded, retryable)
 Reporter = Callable[["Result"], None]
 NEEDS_CONTACT = "needs contact"  # skip reason prefix: a company worth writing to, but no address we trust
+FOUNDER_INBOXES = {"founders", "founder"}  # generic-looking, but they reach the founders
 _PAGE_KIND = {"job_board": "a job-board page", "news": "a news article", "other": "not a company website"}
 
 
@@ -94,6 +95,13 @@ class Pipeline:
         log.log(logging.DEBUG if level == "INFO" else getattr(logging, level), "%s: %s", domain, message)
         if not self.dry_run:
             self.db.log(level, message, domain)
+
+    def _generic_only(self, email: EmailResult, founder: Optional[str]) -> bool:
+        """A hello@-style inbox that GENERIC_INBOX says not to draft to. founders@ is the founders' own."""
+        if email.confidence != "generic" or email.email.split("@")[0] in FOUNDER_INBOXES:
+            return False
+        mode = self.settings.generic_inbox
+        return mode == "never" or (mode == "no_founder" and founder is not None)
 
     def _skip(self, domain: str, url: str, source: str, reason: str, **kw: Optional[str]) -> Result:
         if not self.dry_run:
@@ -162,6 +170,10 @@ class Pipeline:
         trace.email_source = f"{email.source} ({email.confidence})"
         if email.is_guess and not self.settings.allow_guessed_emails:
             return self._skip(domain, url, source, f"{NEEDS_CONTACT}: guessed {email.email}, not verified",
+                              company_name=company.company_name, founder_name=founder)
+        if self._generic_only(email, founder):
+            reach = f"; reach {founder} directly" if founder else ""
+            return self._skip(domain, url, source, f"{NEEDS_CONTACT}: only a generic inbox ({email.email}){reach}",
                               company_name=company.company_name, founder_name=founder)
         if self.db.email_taken(email.email):
             return self._skip(domain, url, source, f"email {email.email} already drafted",

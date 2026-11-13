@@ -176,6 +176,12 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
   under *Needs a contact* in `status` so you can find an address and retry with `target <url> --force`
   (`ALLOW_GUESSED_EMAILS=1` restores the old behaviour). A founder the model names is only used if the
   site itself names them.
+- **Generic inboxes**: when the site names a founder but the only address is a generic one (`hello@`,
+  `info@`, `contact@`, `team@`), the company goes under *Needs a contact* instead of being drafted, because
+  those inboxes rarely reach the founder. `status` lists the founder with a LinkedIn search link, so you can
+  reach them directly. Without a named founder, the generic inbox is still drafted ("Hi Acme team,").
+  `founders@` always counts as the founders' own. `GENERIC_INBOX=always` restores the old behaviour, and
+  `GENERIC_INBOX=never` never drafts to one.
 - **Open internships**: if the company's site links to a public Greenhouse, Lever or Ashby job board (on any
   page read, or on its careers page), seedreach reads the board and, when an engineering, AI or data
   internship is open, names it in the draft ("I saw your Backend Engineering Intern opening."). Other

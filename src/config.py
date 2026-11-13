@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     headless: bool = False  # set on servers/CI: never open a browser for Gmail sign-in
     allow_guessed_emails: bool = False  # draft to {first}@domain guesses with no evidence (most bounce or go unread)
+    # Draft to a generic inbox (hello@, info@, contact@, team@)? "no_founder" (default): only when the site
+    # names no founder; when it does, the company goes under "Needs a contact" so you can reach the founder
+    # directly. "always": the old behaviour. "never": never. founders@ always counts as the founders' own.
+    generic_inbox: Literal["always", "no_founder", "never"] = "no_founder"
     # Read the company's public Greenhouse/Lever/Ashby board for open internships and name one in the draft
     check_job_boards: bool = True
 
