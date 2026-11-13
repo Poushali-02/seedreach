@@ -23,6 +23,12 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   people"). Headcount is used rather than funding stage, because Apollo labels Ramp, Vercel and Stripe
   all "Venture (Round not Specified)".
 
+- Internships first posted more than 60 days ago aren't named (`MAX_ROLE_AGE_DAYS`, 0 for no limit).
+  Job boards list every posting the company hasn't taken down, and some stay up for years: Palantir's
+  Lever board still lists openings from 2024. seedreach now reads each posting's date (Greenhouse
+  `first_published`, Lever `createdAt`, Ashby `publishedAt`), prefers the newest, and shows the date in
+  the digest and the run log. A role whose board gives no date is kept.
+
 - `PREFER_REGIONS` ranks leads from every source by region, most wanted first, for example
   `PREFER_REGIONS=India,Remote` (#35): companies listing India come first, then remote ones, then the
   rest. Nothing is dropped. YC companies carry their YC regions, Hacker News roles count as `Remote`

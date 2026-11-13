@@ -132,3 +132,46 @@ def test_unreadable_boards_are_reported_never_raised():
     assert check.roles == []
     assert check.problems == ["greenhouse:gone not_found", "lever:gone not_found", "ashby:acme bad_json",
                               "lever:slow timeout"]
+
+
+def test_roles_keep_the_date_each_board_says_they_were_first_posted():
+    from datetime import date
+    from src.enrichment.job_boards import _roles_from
+
+    # field names and formats as the live APIs returned them on 2026-11-13
+    greenhouse = {"jobs": [{"title": "Software Engineering Intern", "absolute_url": "g",
+                            "updated_at": "2026-10-30T14:45:41-04:00",  # changes on every sync: ignored
+                            "first_published": "2026-05-21T09:26:09-04:00"}]}
+    lever = [{"text": "Backend Intern", "hostedUrl": "l", "categories": {"commitment": "Internship"},
+              "createdAt": 1786469891368}]
+    ashby = {"jobs": [{"title": "Data Intern", "jobUrl": "a", "isListed": True, "employmentType": "Intern",
+                       "publishedAt": "2025-07-31T21:58:34.674+00:00"},
+                      {"title": "ML Intern", "jobUrl": "b", "isListed": True, "publishedAt": "not a date"}]}
+    assert [r.posted for r in _roles_from(Board("greenhouse", "v"), greenhouse)] == [date(2026, 5, 21)]
+    assert [r.posted for r in _roles_from(Board("lever", "p"), lever)] == [date(2026, 8, 11)]
+    assert [r.posted for r in _roles_from(Board("ashby", "r"), ashby)] == [date(2025, 7, 31), None]
+
+
+def test_best_role_skips_old_openings_and_prefers_the_newest():
+    from datetime import date, timedelta
+
+    today = date(2026, 11, 13)
+
+    def role(title, days_ago):
+        return Role(title, title, "x", None if days_ago is None else today - timedelta(days=days_ago))
+
+    roles = [role("Backend Intern (old)", 400), role("Backend Intern (new)", 10), role("Backend Intern (mid)", 45)]
+    assert BoardCheck(roles).best_role(60, today).title == "Backend Intern (new)"
+    # the limit counts whole days: 60 days ago is still in, 61 is out
+    assert BoardCheck([role("Backend Intern", 60)]).best_role(60, today) is not None
+    assert BoardCheck([role("Backend Intern", 61)]).best_role(60, today) is None
+    # a preferred (backend/AI/data) role still beats a newer frontend one, as long as it's recent enough
+    assert BoardCheck([role("Frontend Engineering Intern", 1), role("Backend Intern", 30)]).best_role(
+        60, today).title == "Backend Intern"
+    # no date: kept, but a dated recent role wins over it
+    assert BoardCheck([role("Backend Intern", None)]).best_role(60, today).posted is None
+    assert BoardCheck([role("AI Intern", None), role("AI Intern", 5)]).best_role(60, today).posted is not None
+    # 0 turns the limit off
+    assert BoardCheck([role("Backend Intern", 900)]).best_role(0, today) is not None
+    stale = BoardCheck(roles)
+    assert len(stale.recent(stale.engineering_roles(), 60, today)) == 2

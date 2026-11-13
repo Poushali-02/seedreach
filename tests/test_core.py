@@ -988,6 +988,36 @@ def test_skipped_companies_keep_their_open_role_for_the_digest(tmp_path: Path):
         "Shiplog", "Ada", "Backend Intern", "https://jobs.ashbyhq.com/s/1")
 
 
+
+def test_old_openings_are_not_named_and_the_digest_shows_the_posting_date(tmp_path: Path):
+    from datetime import date, timedelta
+    from types import SimpleNamespace as NS
+    from src.digest import build_digest
+    from src.enrichment.email_finder import EmailResult
+    from src.enrichment.job_boards import Board, BoardCheck, Role
+    from src.intelligence.scraper import ScrapedPage
+    from src.pipeline import Result
+
+    def process(posted):
+        pipe = _traced_pipeline(tmp_path, "Shiplog was started by Ada.")
+        pipe.scraper = NS(fetch=lambda url: ScrapedPage(url=url, domain="useshiplog.com",
+                                                        text="Shiplog was started by Ada.", pages=[url],
+                                                        job_boards=[Board("ashby", "shiplog")]))
+        pipe.boards = NS(check=lambda boards: BoardCheck(roles=[Role("Backend Intern", "https://j/1", "x", posted)]))
+        pipe.finder = NS(find=lambda *a: EmailResult("hello@useshiplog.com", "mailto", "generic"))
+        return pipe.process("https://useshiplog.com", "hn")
+
+    today = date.today()
+    fresh = process(today - timedelta(days=3))
+    assert (fresh.role, fresh.role_posted) == ("Backend Intern", today - timedelta(days=3))
+    old = process(today - timedelta(days=200))  # over MAX_ROLE_AGE_DAYS (60)
+    assert (old.role, old.apply_url, old.role_posted) == (None, None, None)
+
+    digest = build_digest([Result("ramp.com", "drafted", "ok", company="Ramp", role="Backend Intern",
+                                  apply_url="https://j/1", role_posted=date(2026, 11, 3))])
+    assert "[Backend Intern](https://j/1), posted 3 Nov 2026" in digest
+
+
 def test_run_writes_the_digest_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from types import SimpleNamespace as NS
     from typer.testing import CliRunner
