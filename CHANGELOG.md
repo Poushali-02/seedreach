@@ -43,6 +43,11 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   (the workflow now needs `issues: write`). Companies skipped for lack of a good address keep their apply
   link: the job board is now read before the email checks.
 
+- Optional run summary to Telegram and/or Discord after `run` ("3 new drafts: HillStar, Alter, Rhem Labs
+  · 2 skipped"), so scheduled runs are easy to review later (#19). Set `TELEGRAM_BOT_TOKEN` and
+  `TELEGRAM_CHAT_ID`, or `DISCORD_WEBHOOK_URL`. It lists company names and counts only, never founder
+  addresses, draft text or skip reasons. Not sent on `--dry-run`; a failed send only logs a warning.
+
 ### Changed
 - If Apollo refuses the key (a paid-only endpoint on the free plan, or a bad key), seedreach logs it once
   and stops asking for the rest of the run, instead of failing on every company.
