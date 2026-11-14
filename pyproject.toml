@@ -1,6 +1,6 @@
 [project]
 name = "seedreach"
-version = "0.5.0"
+version = "0.5.1"
 description = "Discover early-stage startups, find founder emails, and save personalized cold-outreach drafts to Gmail."
 requires-python = ">=3.10"
 

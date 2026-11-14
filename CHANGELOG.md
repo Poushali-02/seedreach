@@ -5,6 +5,10 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-14
+
+Your resume link is back in every draft.
+
 ### Fixed
 - Short emails (the default style) now include your resume link. They showed only the first two of
   portfolio, GitHub, LinkedIn and resume, so the resume was always cut. The resume is now added after the
@@ -191,7 +195,8 @@ First public release.
 - `HEADLESS` mode and a GitHub Actions template for scheduled runs from a private repo.
 - Contributing guide, security policy, issue templates and CI on Python 3.10 and 3.13.
 
-[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/Poushali-02/seedreach/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Poushali-02/seedreach/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Poushali-02/seedreach/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/Poushali-02/seedreach/compare/v0.3.1...v0.3.2
