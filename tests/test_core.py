@@ -157,6 +157,16 @@ def test_email_finder_order_and_site_pattern(monkeypatch: pytest.MonkeyPatch):
 
 
 # ---- scraper / sourcing parsing ---------------------------------------
+def test_short_email_always_includes_the_resume():
+    with_cv = dataclasses.replace(PROFILE, resume="https://drive.example/cv.pdf")
+    body = generate_email(_company("DevTools"), with_cv).body
+    assert "Resume: https://drive.example/cv.pdf" in body
+    assert "linkedin.com" not in body  # still only two of portfolio/GitHub/LinkedIn
+    assert len(body.split()) <= 140
+    no_cv = dataclasses.replace(PROFILE, resume="")
+    assert "Resume:" not in generate_email(_company("DevTools"), no_cv).body
+
+
 def test_scraper_extracts_text_meta_mailto_and_about_links():
     html = """<html><head><title>Shiplog</title><meta name="description" content="Changelogs"></head>
     <body><script>x()</script><h1>Ship notes</h1><a href="mailto:ada@shiplog.io?subject=hi">mail</a>

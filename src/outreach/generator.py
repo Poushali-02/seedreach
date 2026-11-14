@@ -38,9 +38,15 @@ def _first_sentence(paragraph: str) -> str:
 
 
 def _links(profile: Profile, limit: int) -> list[str]:
-    labelled = [("Portfolio", profile.portfolio), ("GitHub", profile.github),
-                ("LinkedIn", profile.linkedin), ("Resume", profile.resume)]
-    return [f"{label}: {value}" for label, value in labelled if value][:limit]
+    """Up to `limit` of portfolio, GitHub and LinkedIn, then the resume whenever it's set.
+
+    The resume is what an internship ask needs most, so it is never the link that gets cut.
+    """
+    labelled = [("Portfolio", profile.portfolio), ("GitHub", profile.github), ("LinkedIn", profile.linkedin)]
+    links = [f"{label}: {value}" for label, value in labelled if value][:limit]
+    if profile.resume:
+        links.append(f"Resume: {profile.resume}")
+    return links
 
 
 def _role_line(role: Optional[str]) -> str:
@@ -76,7 +82,7 @@ def _long(company: CompanyProfile, profile: Profile, name: str, greeting: str, r
         "\n\n".join(profile.projects_for(company.core_domain)),
         f"{profile.experience} My core stack is {profile.stack}.",
         profile.closing,
-        "\n".join(_links(profile, 4)),
+        "\n".join(_links(profile, 3)),
         f"Best,\n{signature}",
     ]
 

@@ -5,6 +5,11 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+### Fixed
+- Short emails (the default style) now include your resume link. They showed only the first two of
+  portfolio, GitHub, LinkedIn and resume, so the resume was always cut. The resume is now added after the
+  two links whenever `resume` is set in `profile.json`.
+
 ## [0.5.0] - 2026-11-14
 
 Fewer wrong companies: no drafts to companies that don't build software.
