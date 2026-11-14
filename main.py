@@ -11,6 +11,7 @@ Drafts are only ever saved to Gmail Drafts; nothing is sent automatically.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -21,10 +22,12 @@ from rich.table import Table
 
 from src.config import get_settings
 from src.db import Database
+from src.digest import build_digest
 from src.intelligence.extractor import ExtractionError
+from src.notify import build_summary, send_summary
 from src.pipeline import Pipeline, Result
 from src.trace import Trace
-from src.utils import domain_of, normalize_url
+from src.utils import domain_of, linkedin_people_search, normalize_url
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="Cold-outreach drafts for early-stage startups.")
 console = Console()
@@ -43,7 +46,7 @@ def _db() -> Database:
     return Database(get_settings().db_path)
 
 
-def _pipeline(db: Database, dry_run: bool, include_large: bool = False) -> Pipeline:
+def _pipeline(db: Database, dry_run: bool, *, include_large: bool = False) -> Pipeline:
     try:
         return Pipeline(get_settings(), db, dry_run=dry_run, include_large=include_large)
     except (ExtractionError, Exception) as exc:  # missing key, OAuth failure, ...
@@ -100,16 +103,28 @@ def run(
     limit: int = typer.Option(5, "--limit", "-n", min=1, help="Stop after this many drafts."),
     source: str = typer.Option("all", "--source", "-s", help="all | yc | launchhn | hn | producthunt"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print drafts; skip Gmail and don't touch the database."),
-    include_large: bool = typer.Option(False, "--include-large", help="Process growth/large companies instead of skipping them."),
+    include_large: bool = typer.Option(False, "--include-large", help="Process growth/large companies instead of "
+                                       "skipping them. (Does not unskip previously skipped companies; use --force on target for that.)"),
+    digest: Optional[Path] = typer.Option(None, "--digest", help="Also write a short Markdown summary here: roles "
+                                          "to apply for, founders to reach, drafts to review (no email addresses)."),
 ) -> None:
     """Fetch new leads, enrich them, and save drafts to Gmail."""
-    pipe = _pipeline(_db(), dry_run, include_large)
+    pipe = _pipeline(_db(), dry_run, include_large=include_large) if include_large else _pipeline(_db(), dry_run)
     try:
         results = pipe.run(limit, source, on_result=_report)
     except ValueError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(2)
+    alerts = pipe.job_alerts()  # empty unless JOB_ALERTS=1
+    if alerts:
+        console.print(f"\n[bold]{len(alerts)} new from your job alerts[/bold] (apply yourself; no draft is made)")
+        for a in alerts:
+            console.print(f"  {a.company}: {a.role}{', ' + a.location if a.location else ''}  [dim]{a.apply_url}[/dim]")
+    if digest is not None:  # written even when empty, so a scheduler can tell "nothing new" from "didn't run"
+        digest.write_text(build_digest(results, dry_run=dry_run, alerts=alerts), encoding="utf-8")
     counts = _summary(results, dry_run)
+    if not dry_run:  # before the exit below, so a failed run still reports
+        send_summary(build_summary(results), get_settings())
     _run_stats(pipe.traces)
     if counts["error"] and not counts["drafted"]:
         raise typer.Exit(1)  # every attempt failed (LLM or Gmail outage): let schedulers flag the run
@@ -120,10 +135,11 @@ def target(
     url: str = typer.Argument(..., help="Startup website, e.g. https://useshiplog.com"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the draft; skip Gmail and the database."),
     force: bool = typer.Option(False, "--force", help="Retry a company previously skipped."),
-    include_large: bool = typer.Option(False, "--include-large", help="Process growth/large companies instead of skipping them."),
+    include_large: bool = typer.Option(False, "--include-large", help="Process growth/large companies instead of "
+                                       "skipping them. (Does not unskip previously skipped companies; use --force for that.)"),
 ) -> None:
     """Run the full pipeline for one specific startup."""
-    pipe = _pipeline(_db(), dry_run, include_large)
+    pipe = _pipeline(_db(), dry_run, include_large=include_large) if include_large else _pipeline(_db(), dry_run)
     result = pipe.process(url, "manual", force=force)
     _report(result)
     if result.outcome == "error":
@@ -180,11 +196,13 @@ def status(events: int = typer.Option(10, "--events", "-e", help="How many recen
         console.print(table)
     waiting = db.needs_contact(10)
     if waiting:
-        table = Table(title="Needs a contact", caption="Find an address you trust, then: python main.py target <url> --force")
-        for col in ("Domain", "Company", "Founder", "Why"):
+        table = Table(title="Needs a contact", caption="Reach the founder directly (the LinkedIn link searches for "
+                      "them), or find an address you trust, then: python main.py target <url> --force")
+        for col in ("Domain", "Company", "Founder", "Why", "Find them"):
             table.add_column(col)
         for r in waiting:
-            table.add_row(r["domain"], r["company_name"] or "-", r["founder_name"] or "-", r["reason"])
+            find = linkedin_people_search(r["founder_name"], r["company_name"] or "") if r["founder_name"] else "-"
+            table.add_row(r["domain"], r["company_name"] or "-", r["founder_name"] or "-", r["reason"], find)
         console.print(table)
     log_rows = db.recent_events(events)
     if log_rows:

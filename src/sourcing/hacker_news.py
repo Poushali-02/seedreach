@@ -51,7 +51,9 @@ def parse_job_comment(html: str) -> Optional[Lead]:
 
     header = text.splitlines()[0]
     name = strip_markdown(header.split("|")[0])[:80] or None
-    return Lead(url=url, source="hacker_news", name_hint=name, context=strip_markdown(text)[:500])
+    # only remote roles get this far (see _REMOTE_RE)
+    return Lead(url=url, source="hacker_news", name_hint=name, context=strip_markdown(text)[:500],
+                regions=("Remote",))
 
 
 class HackerNewsProvider(BaseSourcingProvider):

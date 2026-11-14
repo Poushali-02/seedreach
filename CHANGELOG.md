@@ -5,6 +5,128 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-14
+
+Job portals that can't be scraped still email you: seedreach now reads those alerts.
+
+### Added
+- Job-alert emails (#36): with `JOB_ALERTS=1`, each run reads the alert emails a job portal sent you
+  (Naukri so far) and lists every new internship in the digest under *From your job alerts*, with the
+  company, role, place and apply link. Each opening is listed once. Off by default.
+  - Needs Gmail's read-only permission, asked for only when the setting is on; the first run after
+    turning it on signs you in again. On a server, replace the saved `token.json` afterwards.
+  - Apply links are saved without their tracking part (it carries your portal user id).
+  - These openings don't become drafts: an alert names a company, not its website.
+  - `JOB_ALERT_DAYS` (3) sets how far back to look; `JOB_ALERT_INTERNSHIPS_ONLY=0` keeps every role.
+
+## [0.5.2] - 2026-11-14
+
+No more drafts to help desks: support inboxes are ignored, and YC companies get their founders from YC.
+
+### Fixed
+- No more drafts to support inboxes. Only a few exact names (`support@`, `billing@`, ...) were ignored, so
+  addresses like `refunds@` and `loansupport@` counted as a person's own: real runs drafted to xPay's
+  refunds inbox and ClickPe's loan-support inbox. Any address whose name contains a support or role word
+  (support, refund, billing, customer, grievance, privacy, ...) is now ignored.
+- YC companies whose site names no founder now use the founders listed on their YC page (CEO first), so
+  they land under *Needs a contact* with the founder's name and a LinkedIn link instead of getting a
+  draft to a team inbox.
+
+## [0.5.1] - 2026-11-14
+
+Your resume link is now in every draft.
+
+### Fixed
+- Short emails (the default style) now include your resume link. They showed only the first two of
+  portfolio, GitHub, LinkedIn and resume, so the resume was always cut. The resume is now added after the
+  two links whenever `resume` is set in `profile.json`.
+
+## [0.5.0] - 2026-11-14
+
+Fewer wrong companies: no drafts to companies that don't build software.
+
+### Added
+- Companies that clearly don't sell software are skipped (#46). The model already reads each site, so it
+  now also says what the company mainly sells (software, hardware, services or other). A company is
+  recorded as skipped, before the job board and email lookups, only when that answer isn't software
+  **and** its domain is "Other", with the reason ("not a software company: sells a service (Laundry
+  pickup and delivery.)"). Both must agree because the model sometimes calls an AI device "hardware"
+  while filing it under AI Agents. Software sold to any industry counts as software, and when the model
+  is unsure it answers software. `SKIP_NON_SOFTWARE=0` turns it off. The evals report software startups
+  that would be skipped, which must stay at zero.
+
+## [0.4.0] - 2026-11-13
+
+The right companies: Indian and remote startups first, open internships with fresh apply links, no
+drafts to generic inboxes when there's a founder to reach, and a digest of each run on your phone.
+
+### Added
+- `PREFER_REGIONS` ranks leads from every source by region, most wanted first, for example
+  `PREFER_REGIONS=India,Remote` (#35): companies listing India come first, then remote ones, then the
+  rest. Nothing is dropped. YC companies carry their YC regions, Hacker News roles count as `Remote`
+  (that source only keeps remote roles), and Launch HN and Product Hunt leads count as the rest. Empty
+  (the default) keeps the old order. The scheduled-runs template passes `YC_REGIONS` and
+  `PREFER_REGIONS` from repository variables.
+- `YC_REGIONS` keeps only YC companies that list one of the given regions, for example
+  `YC_REGIONS=India,Remote` (#35). Names match YC's own region names whole and ignore case, so `Remote`
+  doesn't also pick up `Partly Remote`. A name no company uses is logged as a warning. Empty (the
+  default) keeps every region, as before.
+- Drafts name an open internship when the company has one (#13). If the site links to a public Greenhouse,
+  Lever or Ashby job board (on the pages already read, or once on its careers page), seedreach reads the
+  board's public API and names an engineering, AI or data internship in the draft: "I saw your Backend
+  Engineering Intern opening." Finance or sales internships aren't mentioned, "Internal Tools" and
+  "International" don't count as internships, and a board that can't be read never stops the draft.
+  `CHECK_JOB_BOARDS=0` turns it off.
+- Internships first posted more than 60 days ago aren't named (`MAX_ROLE_AGE_DAYS`, 0 for no limit).
+  Job boards list every posting the company hasn't taken down, and some stay up for years: Palantir's
+  Lever board still lists openings from 2024. seedreach now reads each posting's date (Greenhouse
+  `first_published`, Lever `createdAt`, Ashby `publishedAt`), prefers the newest, and shows the date in
+  the digest and the run log. A role whose board gives no date is kept.
+- `run --digest FILE` writes a short Markdown summary of the run: open internships with apply links,
+  founders to reach on LinkedIn when only a generic or guessed address was found, and drafts to review.
+  It holds no email addresses. The scheduled-runs template posts it as a comment on an issue titled
+  "seedreach: apply and reach out" and @-mentions you, so it reaches your phone through the GitHub app
+  (the workflow now needs `issues: write`). Companies skipped for lack of a good address keep their apply
+  link: the job board is now read before the email checks.
+- Optional run summary to Telegram and/or Discord after `run` ("3 new drafts: HillStar, Alter, Rhem Labs
+  · 2 skipped"), so scheduled runs are easy to review later (#19, by @musmanghani13). Set
+  `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, or `DISCORD_WEBHOOK_URL`. It lists company names and counts
+  only, never founder addresses, draft text or skip reasons. Not sent on `--dry-run`; a failed send only
+  logs a warning.
+- With an Apollo key, companies with more than `MAX_EMPLOYEES` people (100 by default) are skipped
+  before any scraping or LLM call, using Apollo's organization lookup, which the free plan allows.
+  Companies Apollo doesn't know are kept, and each draft shows the stage and size it found ("Seed, ~7
+  people"). Headcount is used rather than funding stage, because Apollo labels Ramp, Vercel and Stripe
+  all "Venture (Round not Specified)".
+
+### Changed
+- If Apollo refuses the key (a paid-only endpoint on the free plan, or a bad key), seedreach logs it once
+  and stops asking for the rest of the run, instead of failing on every company.
+- No more drafts to `hello@`, `info@`, `contact@` or `team@` when the site names a founder: those
+  inboxes rarely reach the founder. The company goes under *Needs a contact* instead, and `status` shows
+  the founder with a LinkedIn search link so you can reach them directly. In the scheduled runner's first
+  108 drafts, 41% went to such generic inboxes. Without a named founder the generic inbox is still drafted,
+  and `founders@` always counts as the founders' own. `GENERIC_INBOX=always` restores the old behaviour;
+  `GENERIC_INBOX=never` never drafts to one.
+- Tests no longer read your `.env` or shell settings, so a personal setting such as `PREFER_REGIONS`
+  can't make them fail locally.
+
+## [0.3.2] - 2026-11-06
+
+Gemini works again on fresh installs, and the scheduled-runs template runs only pinned code.
+
+### Fixed
+- Every Gemini call failed with `404 NOT_FOUND` on new installs. `google-genai` 3.0.0 (released
+  2026-11-06) changed its default API version from `v1beta` to `v1`, where `gemini-flash-lite-latest`
+  isn't available. `requirements.txt` now caps it at `<3`. If you're stuck on 3.x, set
+  `GOOGLE_GENAI_API_VERSION=v1beta`.
+
+### Changed
+- GitHub Actions in `tests.yml` and the scheduled-runs template are pinned to commit IDs (with the
+  version as a comment), and the template pins `SEEDREACH_REF` to the release's commit instead of its
+  tag. A tag can be moved to different code; a commit can't, and the runner job holds your Gmail token.
+  The template also moves to `actions/checkout` and `actions/setup-python` v7, matching `tests.yml`.
+
 ## [0.3.1] - 2026-11-03
 
 Reach real people: no drafts to blind email guesses or to founders the site doesn't name, shorter
@@ -100,7 +222,13 @@ First public release.
 - `HEADLESS` mode and a GitHub Actions template for scheduled runs from a private repo.
 - Contributing guide, security policy, issue templates and CI on Python 3.10 and 3.13.
 
-[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Poushali-02/seedreach/compare/v0.5.2...v0.6.0
+[0.5.2]: https://github.com/Poushali-02/seedreach/compare/v0.5.1...v0.5.2
+[0.5.1]: https://github.com/Poushali-02/seedreach/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/Poushali-02/seedreach/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/Poushali-02/seedreach/compare/v0.3.2...v0.4.0
+[0.3.2]: https://github.com/Poushali-02/seedreach/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/Poushali-02/seedreach/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Poushali-02/seedreach/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Poushali-02/seedreach/compare/v0.1.0...v0.2.0

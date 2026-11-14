@@ -33,6 +33,20 @@ _BAD_LOCALPARTS = {
     "security", "billing", "sales", "help", "admin", "webmaster", "postmaster", "media", "pr",
 }
 _GENERIC_OK = {"founders", "founder", "hello", "hi", "team", "contact", "info", "hey"}
+# Customer-service and other role inboxes often carry a prefix or suffix (refunds@, loansupport@,
+# customercare@), so these words count anywhere in the local part. Short ones only as the whole part.
+_ROLE_WORDS = (
+    "support", "refund", "billing", "invoice", "payment", "customer", "service", "complaint", "grievance",
+    "compliance", "privacy", "legal", "abuse", "security", "noreply", "no-reply", "donotreply", "postmaster",
+    "webmaster", "careers", "feedback", "enquir", "inquir", "nodal", "press", "marketing",
+)
+_ROLE_EXACT = {"help", "sales", "admin", "media", "pr", "jobs", "hr", "care", "ops", "kyc", "accounts", "bd"}
+
+
+def is_role_inbox(local_part: str) -> bool:
+    """A support, billing or other role inbox that no founder reads: never drafted to."""
+    local = local_part.lower()
+    return local in _BAD_LOCALPARTS or local in _ROLE_EXACT or any(word in local for word in _ROLE_WORDS)
 
 Source = Literal["apollo", "mailto", "heuristic"]
 GUESS = "guess"
@@ -67,10 +81,11 @@ class EmailFinder:
     def __init__(self, settings: Settings, client: Optional[httpx.Client] = None) -> None:
         self.settings = settings
         self.client = client or httpx.Client(timeout=settings.http_timeout)
+        self.apollo_enabled = bool(settings.apollo_api_key)  # off for the run once Apollo refuses the key
 
     # ---- providers -----------------------------------------------------
     def _apollo(self, domain: str, company: str, first: str, last: Optional[str]) -> Optional[EmailResult]:
-        if not self.settings.apollo_api_key:
+        if not self.apollo_enabled:
             return None
         payload = {
             "first_name": first, "last_name": last or "", "domain": domain,
@@ -81,6 +96,11 @@ class EmailFinder:
                 APOLLO_URL, json=payload,
                 headers={"X-Api-Key": self.settings.apollo_api_key, "Cache-Control": "no-cache"},
             )
+            if resp.status_code in (401, 403):  # bad key, or the free plan (people/match is paid-only)
+                self.apollo_enabled = False
+                log.warning("Apollo email lookups are off for this run (HTTP %s): %s",
+                            resp.status_code, resp.text[:160])
+                return None
             resp.raise_for_status()
             person = resp.json().get("person") or {}
         except (httpx.HTTPError, ValueError) as exc:
@@ -96,7 +116,7 @@ class EmailFinder:
     def _site_addresses(domain: str, mailtos: list[str]) -> tuple[list[str], list[str]]:
         """(personal, generic) addresses at the company's domain, minus inboxes nobody reads as a person."""
         usable = [m for m in mailtos if m.endswith("@" + domain) or m.endswith("." + domain)]
-        usable = [m for m in usable if m.split("@")[0] not in _BAD_LOCALPARTS]
+        usable = [m for m in usable if not is_role_inbox(m.split("@")[0])]
         return ([m for m in usable if m.split("@")[0] not in _GENERIC_OK],
                 [m for m in usable if m.split("@")[0] in _GENERIC_OK])
 

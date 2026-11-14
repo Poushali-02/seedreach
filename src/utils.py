@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 # Hosts where the subdomain *is* the company, so we keep the full hostname.
 _PLATFORM_SUFFIXES = (
@@ -100,3 +100,9 @@ def strip_markdown(text: str) -> str:
     """Remove characters that would render as markdown in a plain-text email."""
     text = re.sub(r"[*#`]+", "", text)
     return re.sub(r"\s+", " ", text).strip()
+
+
+def linkedin_people_search(name: str, company: str = "") -> str:
+    """A LinkedIn people-search link for someone at a company (it opens your own LinkedIn search)."""
+    keywords = " ".join(f"{name} {display_name(company) if company else ''}".split())
+    return "https://www.linkedin.com/search/results/people/?" + urlencode({"keywords": keywords})

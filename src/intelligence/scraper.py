@@ -12,6 +12,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from src.config import Settings
+from src.enrichment.job_boards import Board, board_urls_in, find_boards
 from src.utils import domain_of, normalize_url, registered_domain
 
 log = logging.getLogger(__name__)
@@ -28,6 +29,8 @@ _LINK_TIERS = tuple(re.compile(rf"\b({words})\b", re.I) for words in (  # whole 
     r"contact",
 ))
 _SKIP_LINK = re.compile(r"career|jobs|blog/|news|press|privacy|terms|legal", re.I)
+# A same-site careers page: not read for founders, but checked once for a job-board link (see fetch).
+_CAREERS_LINK = re.compile(r"\b(careers?|jobs|join[- ]us|hiring|work[- ]with[- ]us)\b", re.I)
 _FOUNDER_WORD = re.compile(r"co-?founder|founder|gründer", re.I)
 
 
@@ -54,6 +57,8 @@ class ScrapedPage:
     mailtos: list[str] = field(default_factory=list)
     pages: list[str] = field(default_factory=list)  # every URL whose text is included
     truncated: bool = False  # text was cut to MAX_TEXT_CHARS
+    job_boards: list[Board] = field(default_factory=list)  # Greenhouse/Lever/Ashby boards the site links to
+    careers_url: str = ""  # a same-site careers page, if one is linked
 
     def as_prompt_text(self) -> str:
         meta = "\n".join(f"{k}: {v}" for k, v in self.meta.items() if v)
@@ -84,6 +89,12 @@ def _parse(html: str, url: str) -> tuple[ScrapedPage, list[str]]:
         a["href"][7:].split("?")[0] for a in soup.find_all("a", href=True)
         if a["href"].lower().startswith("mailto:")
     ]
+    # job boards can be linked, embedded in an iframe, or loaded by a script; read them before those tags go
+    refs = [urljoin(url, tag.get(attr) or "") for tag, attr in
+            [(a, "href") for a in soup.find_all("a", href=True)] +
+            [(t, "src") for t in soup.find_all(["iframe", "script"], src=True)]]
+    page.job_boards = find_boards(refs + board_urls_in(html))
+
     # candidate team/about links, same site only, ranked by how likely they are to name the founders
     host = registered_domain(urlparse(url).hostname or "")
     ranked: dict[str, int] = {}
@@ -95,6 +106,8 @@ def _parse(html: str, url: str) -> tuple[ScrapedPage, list[str]]:
         if target.rstrip("/") == url.rstrip("/") or len([s for s in t.path.split("/") if s]) > 2:
             continue  # the page itself, or a deep page such as a blog post
         if _SKIP_LINK.search(t.path):
+            if not page.careers_url and _CAREERS_LINK.search(f"{t.path} {a.get_text(' ', strip=True)}"):
+                page.careers_url = target
             continue
         label = f"{t.path} {a.get_text(' ', strip=True)}"
         tier = next((i for i, rx in enumerate(_LINK_TIERS) if rx.search(label)), None)
@@ -113,6 +126,7 @@ def _parse(html: str, url: str) -> tuple[ScrapedPage, list[str]]:
 
 class Scraper:
     def __init__(self, settings: Settings, client: Optional[httpx.Client] = None) -> None:
+        self.check_careers_page = settings.check_job_boards
         self.client = client or httpx.Client(
             timeout=settings.http_timeout,
             follow_redirects=True,
@@ -158,6 +172,15 @@ class Scraper:
             extras.append(f"\n\n--- {sub_url} ---\n{_excerpt(sub.text, EXTRA_PAGE_CHARS)}")
             page.mailtos = _extract_emails(page.mailtos + sub.mailtos)
             page.pages.append(sub_url)
+            page.job_boards += [b for b in sub.job_boards if b not in page.job_boards]
+
+        # no board linked so far: one look at the careers page, only for its board link (its text isn't kept)
+        if not page.job_boards and page.careers_url and self.check_careers_page:
+            try:
+                careers_html, careers_url = self._get_html(page.careers_url)
+                page.job_boards = _parse(careers_html, careers_url)[0].job_boards
+            except ScrapeError as exc:
+                log.debug("careers page unavailable: %s", exc)
 
         # the first page gets what the extra pages leave, so the team page always reaches the model
         budget = MAX_TEXT_CHARS - sum(len(e) for e in extras)

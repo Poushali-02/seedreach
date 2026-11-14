@@ -57,6 +57,14 @@ CREATE TABLE IF NOT EXISTS traces (
     draft_ms        INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_traces_run ON traces (run_id);
+CREATE TABLE IF NOT EXISTS alert_jobs (
+    apply_url  TEXT PRIMARY KEY,
+    portal     TEXT NOT NULL,
+    company    TEXT NOT NULL,
+    role       TEXT NOT NULL,
+    location   TEXT,
+    first_seen TEXT NOT NULL
+);
 """
 
 
@@ -151,6 +159,19 @@ class Database:
             domain, url, source, "skipped", company_name=company_name, founder_name=founder_name,
             reason=reason,
         )
+
+    def alert_job_seen(self, apply_url: str) -> bool:
+        with self._conn() as conn:
+            return conn.execute("SELECT 1 FROM alert_jobs WHERE apply_url = ?", (apply_url,)).fetchone() is not None
+
+    def add_alert_job(self, portal: str, company: str, role: str, apply_url: str, location: str = "") -> bool:
+        """Remember an opening from a job-alert email. Returns False if an earlier run already listed it."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO alert_jobs (apply_url, portal, company, role, location, first_seen) "
+                "VALUES (?, ?, ?, ?, ?, ?)", (apply_url, portal, company, role, location, _now()),
+            )
+        return cur.rowcount == 1
 
     def log(self, level: str, message: str, domain: Optional[str] = None) -> None:
         with self._conn() as conn:

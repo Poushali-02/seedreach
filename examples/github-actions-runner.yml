@@ -30,12 +30,15 @@ concurrency:
 
 permissions:
   contents: write                  # to commit the updated database to the state branch
+  issues: write                    # to post each run's digest on an issue (see "Post the digest")
 
 env:
   SEEDREACH_REPO: Poushali-02/seedreach   # the code to run; change if you use a fork
   # Pin to a release you have reviewed, never main: this job holds your Gmail token, so it should only
-  # run code you trust. To upgrade, read the new release, then bump this tag.
-  SEEDREACH_REF: v0.3.1
+  # run code you trust. Use the release's commit ID, not its tag: a tag can be moved, a commit can't.
+  # To upgrade, read the new release, run `git rev-parse vX.Y.Z^{commit}` in seedreach, put the result
+  # here and update the version comment.
+  SEEDREACH_REF: 78c7d5c44a34793f1a5fd790eebda474ddb534fb # v0.6.0
 
 jobs:
   run:
@@ -43,19 +46,19 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out saved state (outreach.db)
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: state
           path: state
 
       - name: Check out seedreach
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ env.SEEDREACH_REPO }}
           ref: ${{ env.SEEDREACH_REF }}
           path: app
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.12"
           cache: pip
@@ -85,10 +88,41 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           APOLLO_API_KEY: ${{ secrets.APOLLO_API_KEY }}
+          YC_REGIONS: ${{ vars.YC_REGIONS }}            # optional repo variables, e.g. India,Remote
+          PREFER_REGIONS: ${{ vars.PREFER_REGIONS }}
+          # Optional repo variable: 1 lists new internships from your job-alert emails in the digest.
+          # GMAIL_TOKEN must then come from a sign-in made with JOB_ALERTS=1 (it needs read access).
+          JOB_ALERTS: ${{ vars.JOB_ALERTS || '0' }}
+          # Optional run summary (company names and counts only); unset secrets mean no message
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           LIMIT: ${{ inputs.limit || '5' }}
           SOURCE: ${{ inputs.source || 'all' }}
           DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
-        run: python main.py run --limit "$LIMIT" --source "$SOURCE" $DRY_RUN
+        run: python main.py run --limit "$LIMIT" --source "$SOURCE" $DRY_RUN --digest "$GITHUB_WORKSPACE/digest.md"
+
+      # Comments on one issue, "seedreach: apply and reach out", and @-mentions you, so the GitHub mobile app
+      # notifies you: roles to apply for, founders to reach on LinkedIn, drafts to review. No email addresses.
+      - name: Post the digest
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+          RUN: ${{ github.run_number }}
+        run: |
+          f="$GITHUB_WORKSPACE/digest.md"
+          if [ ! -s "$f" ]; then echo "Nothing new for you in this run."; exit 0; fi
+          title="seedreach: apply and reach out"
+          n=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" \
+                --json number --jq '.[0].number // empty')
+          if [ -z "$n" ]; then
+            url=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+                    --body "Each scheduled run comments here with roles to apply for, founders to reach and drafts to review.")
+            n="${url##*/}"
+          fi
+          { echo "@$OWNER, run $RUN:"; echo; cat "$f"; } > "$RUNNER_TEMP/comment.md"
+          gh issue comment "$n" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/comment.md"
 
       - name: Save state
         if: ${{ always() && !inputs.dry_run }}

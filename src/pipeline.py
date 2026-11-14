@@ -3,24 +3,29 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from datetime import datetime, timezone
+from dataclasses import dataclass, replace
+from datetime import date, datetime, timezone
 from typing import Callable, Iterator, Optional
 from urllib.parse import urlparse
 
+import httpx
+
 from src.config import Settings
 from src.db import Database
-from src.enrichment.email_finder import EmailFinder
-from src.intelligence.extractor import ExtractionError, Extractor
+from src.enrichment.email_finder import EmailFinder, EmailResult
+from src.enrichment.company_facts import CompanyFactsClient
+from src.enrichment.job_boards import JobBoardChecker
+from src.intelligence.extractor import ExtractionError, Extractor, clearly_not_software
 from src.intelligence.scraper import ScrapeError, Scraper
 from src.outreach.generator import EmailDraft, generate_email
 from src.outreach.gmail_client import GmailDraftClient, GmailError
 from src.profile import load_profile
-from src.sourcing.base import BaseSourcingProvider, Lead
+from src.sourcing.base import BaseSourcingProvider, Lead, parse_preferences, region_rank
 from src.sourcing.hacker_news import HackerNewsProvider
+from src.sourcing.job_alerts import AlertJob, gmail_query, jobs_in
 from src.sourcing.launch_hn import LaunchHNProvider
 from src.sourcing.product_hunt import ProductHuntProvider
-from src.sourcing.yc_directory import YCDirectoryProvider
+from src.sourcing.yc_directory import YCDirectoryProvider, yc_founders
 from src.trace import Trace, name_in_text
 from src.utils import domain_of, non_company_kind, normalize_url
 
@@ -29,7 +34,9 @@ log = logging.getLogger(__name__)
 # Outcomes: drafted | skipped (recorded, never retried) | duplicate (already known) | error (not recorded, retryable)
 Reporter = Callable[["Result"], None]
 NEEDS_CONTACT = "needs contact"  # skip reason prefix: a company worth writing to, but no address we trust
+FOUNDER_INBOXES = {"founders", "founder"}  # generic-looking, but they reach the founders
 _PAGE_KIND = {"job_board": "a job-board page", "news": "a news article", "other": "not a company website"}
+_BUSINESS = {"hardware": "makes hardware", "services": "sells a service", "other": "doesn't sell software"}
 
 
 def _not_company_site(kind: str, company: Optional[str] = None) -> str:
@@ -44,6 +51,13 @@ class Result:
     detail: str
     draft: Optional[EmailDraft] = None
     to: Optional[str] = None
+    # what we learned about the company, for the run digest (see src/digest.py)
+    company: Optional[str] = None
+    founder: Optional[str] = None
+    role: Optional[str] = None  # an open engineering internship read from its job board
+    apply_url: Optional[str] = None
+    role_posted: Optional[date] = None  # when that opening was first posted, if the board says
+    size: str = ""  # e.g. "Seed, ~7 people" (Apollo)
 
 
 def build_providers(settings: Settings, names: str = "all") -> list[BaseSourcingProvider]:
@@ -72,6 +86,34 @@ def interleave(streams: list[Iterator[Lead]]) -> Iterator[Lead]:
                 yield lead
 
 
+def ranked_interleave(streams: list[Iterator[Lead]], rank: Callable[[Lead], int]) -> Iterator[Lead]:
+    """Like interleave, but always take the best-ranked lead (lowest rank) waiting at the front of a source.
+
+    Sources take turns among equally ranked leads. Each source should yield its best leads first (the
+    YC provider sorts by the same preference); only one lead per source is read ahead, so it stays lazy.
+    """
+    heads: list[tuple[Iterator[Lead], Lead]] = []
+    for stream in streams:
+        lead = next(stream, None)
+        if lead is not None:
+            heads.append((stream, lead))
+    turn = 0
+    while heads:
+        best = min(rank(lead) for _, lead in heads)
+        order = list(range(turn, len(heads))) + list(range(turn))
+        i = next(i for i in order if rank(heads[i][1]) == best)
+        stream, lead = heads[i]
+        yield lead
+        following = next(stream, None)
+        if following is None:
+            heads.pop(i)
+            turn = i
+        else:
+            heads[i] = (stream, following)
+            turn = i + 1
+        turn = turn % len(heads) if heads else 0
+
+
 class Pipeline:
     def __init__(self, settings: Settings, db: Database, *, dry_run: bool = False, include_large: bool = False) -> None:
         self.settings = settings
@@ -84,7 +126,13 @@ class Pipeline:
         self.scraper = Scraper(settings)
         self.extractor = Extractor(settings)
         self.finder = EmailFinder(settings)
-        self.gmail = GmailDraftClient(settings.google_credentials_file, settings.google_token_file, settings.headless)
+        self.boards = JobBoardChecker(settings.http_timeout)
+        self.company_facts = CompanyFactsClient(settings.apollo_api_key, settings.http_timeout)
+        self.founder_pages: dict[str, str] = {}  # domain -> a page listing its founders (YC leads)
+        self.yc_client = httpx.Client(timeout=settings.http_timeout, follow_redirects=True,
+                                      headers={"User-Agent": settings.user_agent})
+        self.gmail = GmailDraftClient(settings.google_credentials_file, settings.google_token_file, settings.headless,
+                                      read_mail=settings.job_alerts)
         if not dry_run:
             self.gmail.ensure_authenticated()  # fail before spending LLM credits
 
@@ -93,6 +141,13 @@ class Pipeline:
         log.log(logging.DEBUG if level == "INFO" else getattr(logging, level), "%s: %s", domain, message)
         if not self.dry_run:
             self.db.log(level, message, domain)
+
+    def _generic_only(self, email: EmailResult, founder: Optional[str]) -> bool:
+        """A hello@-style inbox that GENERIC_INBOX says not to draft to. founders@ is the founders' own."""
+        if email.confidence != "generic" or email.email.split("@")[0] in FOUNDER_INBOXES:
+            return False
+        mode = self.settings.generic_inbox
+        return mode == "never" or (mode == "no_founder" and founder is not None)
 
     def _skip(self, domain: str, url: str, source: str, reason: str, **kw: Optional[str]) -> Result:
         if not self.dry_run:
@@ -122,6 +177,14 @@ class Pipeline:
             return Result(domain, "duplicate", f"already {status}")
         if kind := non_company_kind(urlparse(url).hostname or ""):  # free: no scrape, no LLM call
             return self._skip(domain, url, source, _not_company_site(kind))
+        facts = None
+        if self.settings.max_employees and self.company_facts.enabled:  # only with an Apollo key
+            with trace.timed("size"):
+                facts = self.company_facts.lookup(domain)
+        if facts and facts.employees and facts.employees > self.settings.max_employees:
+            return self._skip(domain, url, source,
+                              f"too big: ~{facts.employees} employees (Apollo), over MAX_EMPLOYEES={self.settings.max_employees}")
+        size_note = f"; {facts.summary()}" if facts and facts.summary() else ""
 
         try:
             with trace.timed("scrape"):
@@ -145,6 +208,13 @@ class Pipeline:
         if company.page_type != "company":  # an article or posting about them, not their site
             return self._skip(domain, url, source, _not_company_site(company.page_type, company.company_name),
                               company_name=company.company_name)
+        if self.settings.skip_non_software and clearly_not_software(company):
+            # before the job board and email lookups, so nothing more is spent on it
+            what = _BUSINESS.get(company.business_type, company.business_type)
+            return self._skip(domain, url, source,
+                              f"not a software company: {what} ({company.one_line_summary})"
+                              "; set SKIP_NON_SOFTWARE=0 to keep these",
+                              company_name=company.company_name)
         if not getattr(self, "include_large", False) and company.stage == "growth/large":
             return self._skip(domain, url, source, f"{company.company_name} is growth/large stage",
                               company_name=company.company_name)
@@ -153,25 +223,61 @@ class Pipeline:
             company = company.model_copy(update={"founder_first_name": None, "founder_last_name": None})
 
         founder = " ".join(p for p in (company.founder_first_name, company.founder_last_name) if p) or None
+        if founder is None and (page_url := self.founder_pages.get(domain)):
+            # the site names no founder, but YC lists them: reach that person instead of a team inbox
+            listed = yc_founders(page_url, self.yc_client)
+            if listed:
+                founder = listed[0][0]
+                first, _, last = founder.partition(" ")
+                company = company.model_copy(update={"founder_first_name": first,
+                                                      "founder_last_name": last or None})
+                self._record("INFO", domain, f"founder from YC: {founder} ({listed[0][1] or 'founder'})")
+
+        # an open internship matters most when there's no good address to write to, so read the job
+        # board before the email checks: skipped companies keep their apply link too
+        role = apply_url = role_posted = None
+        if page.job_boards and self.settings.check_job_boards:
+            with trace.timed("jobs"):
+                boards = self.boards.check(page.job_boards)
+            max_age = self.settings.max_role_age_days
+            best = boards.best_role(max_age)
+            if best:
+                role, apply_url, role_posted = best.title, best.url or None, best.posted
+            engineering = boards.engineering_roles()
+            stale = len(engineering) - len(boards.recent(engineering, max_age))
+            if stale:
+                self._record("INFO", domain, f"{stale} internship(s) posted over {max_age} days ago not named")
+            if boards.problems:
+                self._record("INFO", domain, f"job boards not read: {', '.join(boards.problems)}")
+        about = dict(company=company.company_name, founder=founder, role=role, apply_url=apply_url,
+                     role_posted=role_posted, size=facts.summary() if facts else "")
+
+        def skip(reason: str) -> Result:
+            result = self._skip(domain, url, source, reason, company_name=company.company_name, founder_name=founder)
+            return replace(result, **about)
+
         with trace.timed("email"):
             email = self.finder.find(
                 page.domain, company.company_name, company.founder_first_name,
                 company.founder_last_name, page.mailtos,
             )
         if email is None:
-            return self._skip(domain, url, source, "no founder email found",
-                              company_name=company.company_name, founder_name=founder)
+            return skip("no founder email found")
         trace.email_source = f"{email.source} ({email.confidence})"
         if email.is_guess and not self.settings.allow_guessed_emails:
-            return self._skip(domain, url, source, f"{NEEDS_CONTACT}: guessed {email.email}, not verified",
-                              company_name=company.company_name, founder_name=founder)
+            return skip(f"{NEEDS_CONTACT}: guessed {email.email}, not verified")
+        if self._generic_only(email, founder):
+            reach = f"; reach {founder} directly" if founder else ""
+            return skip(f"{NEEDS_CONTACT}: only a generic inbox ({email.email}){reach}")
         if self.db.email_taken(email.email):
-            return self._skip(domain, url, source, f"email {email.email} already drafted",
-                              company_name=company.company_name, founder_name=founder)
+            return skip(f"email {email.email} already drafted")
 
-        draft = generate_email(company, self.profile)
+        posted_note = f", posted {role_posted}" if role and role_posted else ""
+        role_note = (f"; role: {role}" if role else "") + posted_note + size_note
+        draft = generate_email(company, self.profile, role=role)
         if self.dry_run:
-            return Result(domain, "drafted", f"dry run ({email.source}: {email.confidence})", draft, email.email)
+            return Result(domain, "drafted", f"dry run ({email.source}: {email.confidence}){role_note}",
+                          draft, email.email, **about)
 
         try:
             with trace.timed("draft"):
@@ -184,8 +290,32 @@ class Pipeline:
             domain, url, source, company_name=company.company_name, founder_name=founder,
             founder_email=email.email, email_source=f"{email.source} ({email.confidence})", draft_id=draft_id,
         )
-        self._record("INFO", domain, f"drafted to {email.email} via {email.source}")
-        return Result(domain, "drafted", f"{email.source}: {email.confidence}", draft, email.email)
+        self._record("INFO", domain, f"drafted to {email.email} via {email.source}{role_note}")
+        return Result(domain, "drafted", f"{email.source}: {email.confidence}{role_note}", draft, email.email,
+                      **about)
+
+    def job_alerts(self) -> list[AlertJob]:
+        """Openings from your job-alert emails that no earlier run has listed (empty unless JOB_ALERTS=1).
+
+        A problem reading mail is logged and gives an empty list: alerts must never fail a run.
+        """
+        if not self.settings.job_alerts:
+            return []
+        try:
+            emails = self.gmail.messages(gmail_query(self.settings.job_alert_days), 30)
+        except GmailError as exc:
+            log.warning("Job alerts not read: %s", exc)
+            return []
+        every = jobs_in(emails, internships_only=False)
+        jobs = jobs_in(emails, internships_only=self.settings.job_alert_internships_only)
+        if self.dry_run:  # dry runs record nothing, so the next real run still lists these
+            new = [j for j in jobs if not self.db.alert_job_seen(j.apply_url)]
+        else:
+            new = [j for j in jobs if self.db.add_alert_job(j.portal, j.company, j.role, j.apply_url, j.location)]
+        # always said, so "nothing new" can be told apart from "mail was never read"
+        log.info("Job alerts: read %d email(s) from the last %d day(s): %d opening(s), %d kept, %d new",
+                 len(emails), self.settings.job_alert_days, len(every), len(jobs), len(new))
+        return new
 
     def run(self, limit: int, source: str = "all", on_result: Optional[Reporter] = None) -> list[Result]:
         """Process queued targets first, then fresh leads, until `limit` drafts exist."""
@@ -211,7 +341,11 @@ class Pipeline:
             handle(row["url"], row["source"], None)
 
         seen: set[str] = set()  # dry runs record nothing, so also dedupe within this run
-        for lead in interleave([p.iter_leads() for p in build_providers(self.settings, source)]):
+        streams = [p.iter_leads() for p in build_providers(self.settings, source)]
+        prefer = parse_preferences(self.settings.prefer_regions)
+        leads = (ranked_interleave(streams, lambda lead: region_rank(lead.regions, prefer))
+                 if prefer else interleave(streams))
+        for lead in leads:
             if drafted >= limit or attempts >= max_attempts:
                 return results
             try:
@@ -221,5 +355,7 @@ class Pipeline:
             if domain in seen or self.db.is_known(domain):
                 continue
             seen.add(domain)
+            if lead.founders_url:
+                self.founder_pages[domain] = lead.founders_url
             handle(lead.url, lead.source, lead.name_hint)
         return results

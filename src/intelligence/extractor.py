@@ -25,6 +25,7 @@ _RETRY_DELAYS = (3, 8, 20)  # seconds between attempts on rate-limit / overload 
 Domain = Literal["DevTools", "AI Agents", "Fintech", "B2B SaaS", "Other"]
 PageType = Literal["company", "news", "job_board", "other"]
 Stage = Literal["pre-seed/seed", "early", "growth/large", "unknown"]
+BusinessType = Literal["software", "hardware", "services", "other"]
 TOOL_NAME = "record_company"
 
 SYSTEM_PROMPT = """You analyse startup websites for a job-seeking engineer who writes cold emails.
@@ -38,8 +39,9 @@ Rules:
   about either way.
 - core_domain: pick the single best fit. DevTools includes developer security tooling.
 - stage: "pre-seed/seed" for a founding team or pre-launch/waitlist project; "early" for Series A/B
-  startups with growing engineering teams; "growth/large" for Series C+, public companies, or large
-  established corporates (e.g. Discord, Fastly, Stripe, Datadog); "unknown" if clues are insufficient.
+  startups with growing engineering teams; "growth/large" only when the page makes it clear that
+  the company is past early stage (public company, Series C or later, or hundreds of employees,
+  e.g. Discord, Fastly, Stripe, Datadog); "unknown" if clues are insufficient or you are unsure.
 - founder_first_name / founder_last_name: ONLY if the text names the person as a founder or
   co-founder. A CEO, CTO or board member who is not called a founder does not count. Never guess,
   infer a name from the company name or an email address, or use names you know from elsewhere.
@@ -49,7 +51,12 @@ Rules:
   engineering question or angle it raises (e.g. "I was curious how X handles Y."). It must be
   grounded in facts present in the text. No flattery, no "I love", "impressive", "amazing",
   "exciting", no markdown, no emoji. If the text is thin, comment on the most concrete technical
-  detail available rather than inventing one."""
+  detail available rather than inventing one.
+- business_type: "software" if the company builds its own software, app, API, platform or AI, whatever
+  industry its customers are in (an AI device or a robot run by its own AI counts). "hardware" or
+  "services" only if it clearly has no software or AI product of its own: reactors, batteries, laundry,
+  clinics, delivery, consulting. "other" for anything else without software of its own. If unsure,
+  "software"."""
 
 
 class CompanyProfile(BaseModel):
@@ -61,6 +68,7 @@ class CompanyProfile(BaseModel):
     founder_last_name: Optional[str] = None
     personalized_hook: str
     page_type: PageType = "company"
+    business_type: BusinessType = "software"
 
     @field_validator("founder_first_name", "founder_last_name", mode="before")
     @classmethod
@@ -77,6 +85,15 @@ class CompanyProfile(BaseModel):
         if not v:
             raise ValueError("must not be empty")
         return v
+
+
+def clearly_not_software(company: CompanyProfile) -> bool:
+    """True only when two answers agree: the company doesn't sell software, and it fits no software domain.
+
+    business_type alone isn't enough: an AI device or a robot is sometimes called "hardware" even when its
+    core_domain is "AI Agents". A skip is permanent, so both signals must point the same way.
+    """
+    return company.business_type != "software" and company.core_domain == "Other"
 
 
 class ExtractionError(Exception):
