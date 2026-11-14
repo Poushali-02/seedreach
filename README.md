@@ -78,7 +78,7 @@ Edit `profile.json`. It is git-ignored, so your details stay on your machine.
 | `portfolio`, `github`, `linkedin`, `resume`, `phone` | no | Shown at the bottom. Blank ones are left out. |
 | `subject` | no | Subject line; `{company}` is replaced with the company name. |
 | `closing` | no | The closing line before your links. (long emails) |
-| `email_style` | no | `short` (default, about 100–130 words: opener, who you are, one project, one ask, two links) or `long` (every section above). |
+| `email_style` | no | `short` (default, about 100–130 words: opener, who you are, one project, one ask, two links and your resume) or `long` (every section above). |
 | `ask` | no | The short email's last line; `{company}` is replaced. Default: *Would you be open to a remote intern at {company}? I'd be glad to start with a short trial task.* |
 
 Plain text only: emails must not contain `*`, `#` or backticks, and the generator refuses to build a draft
@@ -204,7 +204,8 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
   board gives no date is kept. "Open" means the company hasn't taken the posting down, not that it's
   still reading applications.
 - **Email copy**: short by default (about 100–130 words): the opener, who you are, the first sentence of your
-  project for the company's domain, one ask and two links. `"email_style": "long"` adds your role pitch, every
+  project for the company's domain, one ask, two links and your resume link (always included when `resume`
+  is set). `"email_style": "long"` adds your role pitch, every
   matching project, experience, stack, closing and all links.
 - **Wrong pages**: a lead that points at a news article or a job-board posting is skipped, not drafted. Known
   hosts are skipped before scraping; the model labels the rest. The reason names the company, so you can add
@@ -252,8 +253,9 @@ Known gaps, each the subject of a follow-up:
 
 - **Board members**: one site lists a real co-founder only under "Board of Directors", and the model
   sometimes names him anyway.
-- **Company fit**: real runs still draft to companies that are past the early stage or don't make
-  software at all (for example, a mobile-MRI service). Fixes are planned in [#2](https://github.com/Poushali-02/seedreach/issues/2) and [#46](https://github.com/Poushali-02/seedreach/issues/46).
+- **Company fit**: companies that clearly don't build software are skipped since v0.5.0 (#46), but
+  without an Apollo key, larger companies from Hacker News threads can still get drafts. A fix is planned
+  in [#2](https://github.com/Poushali-02/seedreach/issues/2).
 - **Domains**: reading more pages made the domain slightly less accurate and less stable; consumer and
   health companies are sometimes filed as B2B SaaS or AI Agents.
 
