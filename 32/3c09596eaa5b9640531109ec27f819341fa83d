@@ -1,0 +1,172 @@
+.env.example
+  s_21f759cbef9c39::t_fd63c3c7fc8b93 63-70
+CHANGELOG.md
+  s_21f759cbef9c39::t_2797aad4ba3404 8-17
+README.md
+  s_21f759cbef9c39::t_ae1d1f3f5aebaf 222-227,232-240
+  s_21f759cbef9c39::t_6fc50730a83a63 228
+  s_21f759cbef9c39::t_9939fe920581e0 229-231
+docs/ARCHITECTURE.md
+  s_21f759cbef9c39::t_73568366c2cfa7 51-55
+  s_21f759cbef9c39::t_0a4601abc581a6 86
+examples/github-actions-runner.yml
+  s_21f759cbef9c39::t_2e2c71fd5b7029 93-95
+main.py
+  s_21f759cbef9c39::t_2fd43dbb92f427 116-120,122
+src/config.py
+  s_21f759cbef9c39::t_f47df8bd6be9a3 69-74
+src/db.py
+  s_21f759cbef9c39::t_8b677bc6d12967 60-67
+  s_21f759cbef9c39::t_f8ade95f35b9e8 163-175
+src/digest.py
+  s_21f759cbef9c39::t_1345963d75f785 10
+  s_21f759cbef9c39::t_e05f5879fbb6a4 16
+  s_21f759cbef9c39::t_aed173b1ed6193 32-34
+  s_21f759cbef9c39::t_afa730c64cd5a7 39
+  s_21f759cbef9c39::t_3025057bcfc1e9 49-53
+src/outreach/gmail_client.py
+  s_21f759cbef9c39::t_790b1d7b7dd4c1 4-6,12,15,26-27,31,35,46-56,58-59,63,68,70-74,84-89,100-102,131-150
+src/pipeline.py
+  s_21f759cbef9c39::t_5b96fbc44f5ddc 25
+  s_21f759cbef9c39::t_e773a673252fd4 133-134
+  s_21f759cbef9c39::t_f24471f796dc62 293-309
+src/sourcing/job_alerts.py
+  s_21f759cbef9c39::t_daf6ef0c724a4d 1-109
+tests/fixtures/job_alerts/naukri_alert.html
+  s_21f759cbef9c39::t_50c56dd96e5312 1-160
+tests/test_core.py
+  s_21f759cbef9c39::t_1375120047fac2 1145,1233
+tests/test_job_alerts.py
+  s_21f759cbef9c39::t_a041f67a5df6f6 1-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "323c09596eaa5b9640531109ec27f819341fa83d",
+  "branch": "feat/job-alert-emails-36",
+  "prompts": {
+    "s_21f759cbef9c39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2444be44-c998-49de-b6bd-587e1d94a941",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:e0699be2804fa2de06f2775b429506921e612c412802c2e529441e97b3b8cd60",
+      "total_additions": 566,
+      "total_deletions": 18,
+      "accepted_lines": 562,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_21f759cbef9c39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2444be44-c998-49de-b6bd-587e1d94a941",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:e0699be2804fa2de06f2775b429506921e612c412802c2e529441e97b3b8cd60",
+      "stats": {
+        "total_additions": 566,
+        "total_deletions": 18,
+        "accepted_lines": 562,
+        "overriden_lines": 0,
+        "files": {
+          ".env.example": {
+            "total_additions": 8,
+            "total_deletions": 0,
+            "accepted_lines": 8,
+            "overriden_lines": 0
+          },
+          "CHANGELOG.md": {
+            "total_additions": 10,
+            "total_deletions": 0,
+            "accepted_lines": 10,
+            "overriden_lines": 0
+          },
+          "README.md": {
+            "total_additions": 22,
+            "total_deletions": 3,
+            "accepted_lines": 19,
+            "overriden_lines": 0
+          },
+          "docs/ARCHITECTURE.md": {
+            "total_additions": 6,
+            "total_deletions": 2,
+            "accepted_lines": 6,
+            "overriden_lines": 0
+          },
+          "examples/github-actions-runner.yml": {
+            "total_additions": 3,
+            "total_deletions": 0,
+            "accepted_lines": 3,
+            "overriden_lines": 0
+          },
+          "main.py": {
+            "total_additions": 6,
+            "total_deletions": 1,
+            "accepted_lines": 6,
+            "overriden_lines": 0
+          },
+          "src/config.py": {
+            "total_additions": 6,
+            "total_deletions": 0,
+            "accepted_lines": 6,
+            "overriden_lines": 0
+          },
+          "src/db.py": {
+            "total_additions": 21,
+            "total_deletions": 0,
+            "accepted_lines": 21,
+            "overriden_lines": 0
+          },
+          "src/digest.py": {
+            "total_additions": 11,
+            "total_deletions": 4,
+            "accepted_lines": 11,
+            "overriden_lines": 0
+          },
+          "src/outreach/gmail_client.py": {
+            "total_additions": 58,
+            "total_deletions": 4,
+            "accepted_lines": 58,
+            "overriden_lines": 0
+          },
+          "src/pipeline.py": {
+            "total_additions": 20,
+            "total_deletions": 1,
+            "accepted_lines": 20,
+            "overriden_lines": 0
+          },
+          "src/sourcing/job_alerts.py": {
+            "total_additions": 109,
+            "total_deletions": 0,
+            "accepted_lines": 109,
+            "overriden_lines": 0
+          },
+          "tests/fixtures/job_alerts/naukri_alert.html": {
+            "total_additions": 160,
+            "total_deletions": 0,
+            "accepted_lines": 160,
+            "overriden_lines": 0
+          },
+          "tests/test_core.py": {
+            "total_additions": 2,
+            "total_deletions": 2,
+            "accepted_lines": 2,
+            "overriden_lines": 0
+          },
+          "tests/test_job_alerts.py": {
+            "total_additions": 124,
+            "total_deletions": 1,
+            "accepted_lines": 123,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  },
+  "integrity": {"v":1,"commit":"323c09596eaa5b9640531109ec27f819341fa83d","tree":"2d1498e613772df705d1c749c0f3bd6fa4139080","files":{".env.example":"42d3b8efa3dc4056d82ac0e34c54091a626f83a4","CHANGELOG.md":"6631bd614287649c5d94322aaaeb6ea5412657cf","README.md":"4d29e24d0b94125f71beae697d03d711443a74df","docs/ARCHITECTURE.md":"259fdec7dba1c0ae3edd600aa6508d68f82453c5","examples/github-actions-runner.yml":"c249da2734b96f07a7505091998d7df10204b4fc","main.py":"62794de9bdcc3c8376385907b3513bee57c9c551","src/config.py":"45ad72895c48cda149d20f13a8bad7d4a6d2ecaf","src/db.py":"881657b6c82a95bfcb3fec209181730660a30911","src/digest.py":"a2265c062d4ccdab7c3935499a03d021543e7eca","src/outreach/gmail_client.py":"4d680c383a23f2fbd942515a8e78d39416bcf9a0","src/pipeline.py":"cf28091f6b34619aabdce75e7c56f6c4f6063c70","src/sourcing/job_alerts.py":"757a7e1dbade9d7215f821d869bd54e412f05e06","tests/fixtures/job_alerts/naukri_alert.html":"44af6c15e778cee99ce6a5e668338d2e8be90808","tests/test_core.py":"909bb0224b4b3a83ef7519643dbc53cb8eeda02e","tests/test_job_alerts.py":"6365936754c669c0460f20162b009d4c28522e9b"},"digest":"75d1aa4556e47d7fce8e6e92724e7e3045e5cd867fec26033bd5856115d3bd6c"}
+}
