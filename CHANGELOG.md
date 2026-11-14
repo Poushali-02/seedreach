@@ -5,6 +5,10 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-14
+
+Job portals that can't be scraped still email you: seedreach now reads those alerts.
+
 ### Added
 - Job-alert emails (#36): with `JOB_ALERTS=1`, each run reads the alert emails a job portal sent you
   (Naukri so far) and lists every new internship in the digest under *From your job alerts*, with the
@@ -218,7 +222,8 @@ First public release.
 - `HEADLESS` mode and a GitHub Actions template for scheduled runs from a private repo.
 - Contributing guide, security policy, issue templates and CI on Python 3.10 and 3.13.
 
-[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Poushali-02/seedreach/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/Poushali-02/seedreach/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/Poushali-02/seedreach/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Poushali-02/seedreach/compare/v0.4.0...v0.5.0
