@@ -5,6 +5,16 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+### Added
+- Companies that clearly don't sell software are skipped (#46). The model already reads each site, so it
+  now also says what the company mainly sells (software, hardware, services or other). A company is
+  recorded as skipped, before the job board and email lookups, only when that answer isn't software
+  **and** its domain is "Other", with the reason ("not a software company: sells a service (Laundry
+  pickup and delivery.)"). Both must agree because the model sometimes calls an AI device "hardware"
+  while filing it under AI Agents. Software sold to any industry counts as software, and when the model
+  is unsure it answers software. `SKIP_NON_SOFTWARE=0` turns it off. The evals report software startups
+  that would be skipped, which must stay at zero.
+
 ## [0.4.0] - 2026-11-13
 
 The right companies: Indian and remote startups first, open internships with fresh apply links, no

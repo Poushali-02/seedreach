@@ -98,6 +98,11 @@ def score_row(label: dict[str, str], pred: Optional[dict[str, Any]], hook_ok: Op
         "hook_rule_problems": hook_rule_problems(pred.get("personalized_hook", "")),
         "hook_ok": hook_ok,
         "flagged_not_company": pred.get("page_type", "company") != "company",
+        # labels.csv may have a business_type column; blank means software, like the model's default
+        "is_software": (label.get("business_type") or "software").lower() == "software",
+        # the pipeline's rule (#46): skipped only when the type isn't software AND the domain is "Other"
+        "pred_software": not (pred.get("business_type", "software") != "software"
+                              and pred.get("core_domain") == "Other"),
         "pred_domain": pred.get("core_domain"),
         "true_domain": label["core_domain"],
     }
@@ -133,6 +138,10 @@ def summarize(results: list[dict[str, Any]]) -> dict[str, Any]:
         "hook_rules_ok": pct(sum(not r["hook_rule_problems"] for r in on_site), len(on_site)),
         "hook_grounded": pct(sum(r["hook_ok"] for r in judged), len(judged)),
         "sendable": pct(sum(r["sendable"] for r in scored), len(scored)),
+        # #46: software startups the model would skip (must stay 0), and non-software ones it catches
+        "software_skipped": [r["domain"] for r in on_site if r["is_software"] and not r["pred_software"]],
+        "non_software_caught": f"{sum(not r['pred_software'] for r in on_site if not r['is_software'])}"
+                               f" of {sum(not r['is_software'] for r in on_site)}",
         "domain_confusions": dict(Counter(
             f"{r['true_domain']} -> {r['pred_domain']}" for r in on_site if not r["domain_ok"]
         )),
@@ -194,6 +203,8 @@ def print_report(summary: dict[str, Any], title: str) -> None:
         f"  hook grounded (human)  {summary['hook_grounded']}%" if summary["hook_grounded"] is not None else "",
         f"  wrong website caught   {summary['wrong_website_caught']}%   "
         f"(company sites wrongly flagged: {summary['company_site_flagged']})",
+        f"  software skipped       {len(summary['software_skipped'])}   {summary['software_skipped'] or ''}",
+        f"  non-software caught    {summary['non_software_caught']}",
         f"  READY TO SEND          {summary['sendable']}%",
     ]
     if summary["domain_confusions"]:

@@ -209,6 +209,11 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
 - **Wrong pages**: a lead that points at a news article or a job-board posting is skipped, not drafted. Known
   hosts are skipped before scraping; the model labels the rest. The reason names the company, so you can add
   its real site with `target`.
+- **Not software**: while reading the site, the model also says what the company mainly sells. A company is
+  skipped, before any email lookup, only when it clearly doesn't sell software (a laundry service, a clinic,
+  a reactor maker) **and** fits none of the software domains; the reason says what it does. A company that
+  sells software to any industry counts as software, and so does an AI device filed under AI Agents or one
+  the model isn't sure about. `SKIP_NON_SOFTWARE=0` keeps them all.
 - **Dedupe**: one row per registrable domain, plus a unique index on drafted emails. Drafted and skipped
   companies are never processed again (use `target <url> --force` to retry a skipped one). LLM or Gmail
   outages are not recorded as skips, so those companies are retried next time.

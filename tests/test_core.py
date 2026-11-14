@@ -762,6 +762,57 @@ def test_model_flagged_article_is_skipped(tmp_path: Path):
     assert r.outcome == "skipped" and "a news article about Shiplog" in r.detail
 
 
+def test_non_software_companies_are_skipped_before_any_lookup(tmp_path: Path):
+    pipe = _traced_pipeline(tmp_path, "Ada")
+    real = pipe.extractor.extract
+    looked_up = []
+    from src.enrichment.email_finder import EmailResult
+    pipe.finder.find = lambda *a: looked_up.append(a) or EmailResult("ada@useshiplog.com", "heuristic", "pattern from site")
+    pipe.extractor.extract = lambda page, hint: real(page, hint).model_copy(
+        update={"business_type": "services", "core_domain": "Other",
+                "one_line_summary": "Mobile MRI scans for clinics."})
+    r = pipe.process("https://useshiplog.com", "hn")
+    assert r.outcome == "skipped" and looked_up == []
+    assert r.detail.startswith("not a software company: sells a service (Mobile MRI scans for clinics.)")
+
+    pipe.settings = Settings(skip_non_software=False)  # opted out: drafted as before
+    assert pipe.process("https://useshiplog2.com", "hn").outcome == "drafted" and len(looked_up) == 1
+
+
+def test_a_device_in_a_software_domain_is_kept():
+    from src.intelligence.extractor import clearly_not_software
+
+    # rhem.ai, an AI wellness device: the model sometimes says "hardware" but files it under AI Agents
+    assert not clearly_not_software(_company("AI Agents", business_type="hardware"))
+    assert clearly_not_software(_company("Other", business_type="hardware"))  # e.g. a reactor maker
+    assert not clearly_not_software(_company("Other"))  # software, just not in a listed domain
+
+
+def test_business_type_defaults_to_software():
+    # an answer without the field (an older model reply, or one that leaves it out) is kept, never skipped
+    assert _company("DevTools").business_type == "software"
+    assert CompanyProfile(**{**_company("DevTools").model_dump(exclude={"business_type"})}).business_type == "software"
+    assert "business_type" in CompanyProfile.model_json_schema()["properties"]
+    with pytest.raises(Exception):
+        _company("DevTools", business_type="biotech")
+
+
+def test_eval_reports_software_startups_the_model_would_skip():
+    from evals.run_evals import score_row, summarize
+
+    def row(domain, label_type, pred_type, pred_domain="Other"):
+        label = {"domain": domain, "company_name": "Shiplog", "core_domain": "DevTools",
+                 "founder_first_name": "Ada", "founder_last_name": "", "business_type": label_type}
+        pred = {**_company("DevTools").model_dump(), "business_type": pred_type, "core_domain": pred_domain}
+        return score_row(label, pred, None)
+
+    summary = summarize([row("a.dev", "", "software"), row("b.dev", "software", "hardware"),
+                         row("rhem.ai", "software", "hardware", "AI Agents"),  # kept: a software domain
+                         row("rinse.com", "services", "services"), row("oklo.com", "hardware", "software")])
+    assert summary["software_skipped"] == ["b.dev"]
+    assert summary["non_software_caught"] == "1 of 2"
+
+
 def test_eval_scores_wrong_website_catches():
     from evals.run_evals import score_row, summarize
 

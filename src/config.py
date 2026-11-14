@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     generic_inbox: Literal["always", "no_founder", "never"] = "no_founder"
     # Read the company's public Greenhouse/Lever/Ashby board for open internships and name one in the draft
     check_job_boards: bool = True
+    # Skip companies the model says clearly don't sell software (hardware makers, services such as clinics
+    # or laundry, energy producers). When unsure the model answers "software", so those are kept.
+    skip_non_software: bool = True
     # Don't name an internship first posted more than this many days ago (openings often stay listed long
     # after anyone reads applications). 0 turns the limit off. Roles whose board gives no date are kept.
     max_role_age_days: int = 60
