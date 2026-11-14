@@ -1142,7 +1142,7 @@ def test_run_writes_the_digest_file(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     found = [Result("ramp.com", "drafted", "ok", company="Ramp", role="Backend Intern",
                     apply_url="https://jobs.ashbyhq.com/ramp/1")]
-    monkeypatch.setattr(main, "_pipeline", lambda db, dry_run: NS(run=lambda *a, **k: found, traces=[]))
+    monkeypatch.setattr(main, "_pipeline", lambda db, dry_run: NS(run=lambda *a, **k: found, job_alerts=lambda: [], traces=[]))
     monkeypatch.setattr(main, "_db", lambda: None)
     out = tmp_path / "digest.md"
     assert CliRunner().invoke(main.app, ["run", "--dry-run", "--digest", str(out)]).exit_code == 0
@@ -1230,7 +1230,7 @@ def test_cli_run_sends_summary_even_when_every_attempt_failed(monkeypatch: pytes
 
     results = [Result("down.dev", "error", "extraction failed")]
     monkeypatch.setattr(main, "_db", lambda: None)
-    monkeypatch.setattr(main, "_pipeline", lambda db, dry_run: NS(run=lambda *a, **k: results, traces=[]))
+    monkeypatch.setattr(main, "_pipeline", lambda db, dry_run: NS(run=lambda *a, **k: results, job_alerts=lambda: [], traces=[]))
     sent = []
     monkeypatch.setattr(main, "send_summary", lambda text, settings: sent.append(text))
 

@@ -113,8 +113,13 @@ def run(
     except ValueError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(2)
+    alerts = pipe.job_alerts()  # empty unless JOB_ALERTS=1
+    if alerts:
+        console.print(f"\n[bold]{len(alerts)} new from your job alerts[/bold] (apply yourself; no draft is made)")
+        for a in alerts:
+            console.print(f"  {a.company}: {a.role}{', ' + a.location if a.location else ''}  [dim]{a.apply_url}[/dim]")
     if digest is not None:  # written even when empty, so a scheduler can tell "nothing new" from "didn't run"
-        digest.write_text(build_digest(results, dry_run=dry_run), encoding="utf-8")
+        digest.write_text(build_digest(results, dry_run=dry_run, alerts=alerts), encoding="utf-8")
     counts = _summary(results, dry_run)
     if not dry_run:  # before the exit below, so a failed run still reports
         send_summary(build_summary(results), get_settings())

@@ -219,6 +219,25 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
   a reactor maker) **and** fits none of the software domains; the reason says what it does. A company that
   sells software to any industry counts as software, and so does an AI device filed under AI Agents or one
   the model isn't sure about. `SKIP_NON_SOFTWARE=0` keeps them all.
+- **Job-alert emails** (`JOB_ALERTS=1`, off by default): portals such as Naukri forbid scraping, but they
+  email you the roles matching the alerts you set up there. With this on, each `run` reads those emails
+  from the last 3 days (`JOB_ALERT_DAYS`) and lists every new internship in the digest under *From your
+  job alerts*, with the company, role, place and apply link. Each opening is listed once.
+  - It needs Gmail's **read-only** permission on top of drafts, so the first run after you turn it on
+    opens the browser to sign in again. Only emails from the alert senders are searched for, in your own
+    inbox; nothing else is opened and nothing is sent anywhere except your digest. In Google Cloud
+    Console, first add `https://www.googleapis.com/auth/gmail.readonly` next to the compose scope (step 5
+    of *Set up Gmail access* above). You don't need to delete `token.json`: seedreach notices it can't
+    read mail and signs you in again.
+  - Naukri (`naukrialerts@naukri.com`) is read today. Other portals need one small parser each, written
+    from a real alert email (`src/sourcing/job_alerts.py`).
+  - These openings are for you to apply to. They don't become drafts, because an alert names a company
+    but not its website. To also write to one, add its site: `python main.py add-target <url>`.
+  - Only titles that say intern, internship, new grad or co-op are kept. `JOB_ALERT_INTERNSHIPS_ONLY=0`
+    keeps every role the portal sent.
+  - Apply links are saved without their tracking part, which carries your portal user id.
+  - Alert emails often land in Spam, which is searched too. A Gmail filter with "Never send it to Spam"
+    for the sender keeps them where you can see them.
 - **Dedupe**: one row per registrable domain, plus a unique index on drafted emails. Drafted and skipped
   companies are never processed again (use `target <url> --force` to retry a skipped one). LLM or Gmail
   outages are not recorded as skips, so those companies are retried next time.

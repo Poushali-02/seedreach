@@ -7,12 +7,13 @@ email addresses, only company names, roles, public apply links and LinkedIn sear
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Iterable, Sequence
 
 from src.utils import linkedin_people_search
 
 if TYPE_CHECKING:  # pragma: no cover
     from src.pipeline import Result
+    from src.sourcing.job_alerts import AlertJob
 
 
 def _name(r: "Result") -> str:
@@ -28,13 +29,14 @@ def _posted(r: "Result") -> str:
     return f", posted {d.day} {d:%b %Y}" if d else ""
 
 
-def build_digest(results: Iterable["Result"], *, dry_run: bool = False) -> str:
-    """Markdown with up to three sections; an empty string when nothing in the run needs you."""
+def build_digest(results: Iterable["Result"], *, dry_run: bool = False,
+                 alerts: Sequence["AlertJob"] = ()) -> str:
+    """Markdown with up to four sections; an empty string when nothing in the run needs you."""
     results = list(results)
     apply = [r for r in results if r.role and r.apply_url]
     reach = [r for r in results if r.outcome == "skipped" and r.founder and r.detail.startswith("needs contact")]
     drafts = [r for r in results if r.outcome == "drafted"]
-    if not (apply or reach or drafts):
+    if not (apply or reach or drafts or alerts):
         return ""
 
     lines: list[str] = []
@@ -43,6 +45,11 @@ def build_digest(results: Iterable["Result"], *, dry_run: bool = False) -> str:
     if apply:
         lines.append("### Apply")
         lines += [f"- {_name(r)}: [{r.role}]({r.apply_url}){_posted(r)}{_size(r)}" for r in apply]
+        lines.append("")
+    if alerts:
+        lines.append("### From your job alerts")
+        lines += [f"- **{a.company}**: [{a.role}]({a.apply_url}){', ' + a.location if a.location else ''} ({a.portal})"
+                  for a in alerts]
         lines.append("")
     if reach:
         lines.append("### Reach the founder on LinkedIn")

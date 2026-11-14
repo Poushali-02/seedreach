@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     # Don't name an internship first posted more than this many days ago (openings often stay listed long
     # after anyone reads applications). 0 turns the limit off. Roles whose board gives no date are kept.
     max_role_age_days: int = 60
+    # Read your own job-alert emails (Naukri so far) and list each new opening in the run digest with its
+    # apply link. Needs Gmail's read-only scope, so the first run after turning this on signs you in again.
+    job_alerts: bool = False
+    job_alert_days: int = 3  # how far back to look for alert emails
+    # Keep only titles that say intern/internship/new grad/co-op. 0 keeps every role the portal sent.
+    job_alert_internships_only: bool = True
     # Optional run summary after `run` to Telegram and/or Discord (company names and counts only);
     # unset means no message
     telegram_bot_token: str = ""
