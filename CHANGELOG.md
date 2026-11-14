@@ -5,6 +5,10 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-14
+
+No more drafts to help desks: support inboxes are ignored, and YC companies get their founders from YC.
+
 ### Fixed
 - No more drafts to support inboxes. Only a few exact names (`support@`, `billing@`, ...) were ignored, so
   addresses like `refunds@` and `loansupport@` counted as a person's own: real runs drafted to xPay's
@@ -204,7 +208,8 @@ First public release.
 - `HEADLESS` mode and a GitHub Actions template for scheduled runs from a private repo.
 - Contributing guide, security policy, issue templates and CI on Python 3.10 and 3.13.
 
-[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/Poushali-02/seedreach/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/Poushali-02/seedreach/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Poushali-02/seedreach/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Poushali-02/seedreach/compare/v0.3.2...v0.4.0
