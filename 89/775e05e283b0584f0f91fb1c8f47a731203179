@@ -1,0 +1,8 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.0.0",
+  "base_commit_sha": "89775e05e283b0584f0f91fb1c8f47a731203179",
+  "branch": "chore/template-v0.4.0",
+  "prompts": {}
+}
