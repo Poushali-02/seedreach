@@ -1,0 +1,9 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "1bc0617d8c76c541e6bbed333cac27277e9d8d0d",
+  "branch": "chore/template-v0.6.0",
+  "prompts": {},
+  "integrity": {"v":1,"commit":"1bc0617d8c76c541e6bbed333cac27277e9d8d0d","tree":"12dce5122531f6ae033a06e98c32eeb56e0578c3","files":{},"digest":"cb9b9aed9ff7199cd36487642282db47400f12c5a180c8e0e321fd5c9fe9bb46"}
+}
