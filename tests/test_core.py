@@ -1086,3 +1086,89 @@ def test_run_writes_the_digest_file(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     found.clear()  # nothing for you: the file is still written, but empty
     assert CliRunner().invoke(main.app, ["run", "--dry-run", "--digest", str(out)]).exit_code == 0
     assert out.read_text(encoding="utf-8") == ""
+
+
+# ---- run summary (Telegram / Discord) ----------------------------------------
+def _summary_results():
+    from src.pipeline import Result
+
+    return [
+        Result("hillstar.io", "drafted", "apollo: verified", to="ada@hillstar.io", company="HillStar, Inc."),
+        Result("alter.dev", "drafted", "site: on site", to="bo@alter.dev"),  # no name: falls back to the domain
+        Result("rhem.ai", "skipped", "needs contact: guessed cy@rhem.ai, not verified", company="Rhem Labs"),
+        Result("shiplog.com", "skipped", "email ada@hillstar.io already drafted", company="Shiplog"),
+        Result("down.dev", "error", "gmail draft failed: dee@down.dev"),
+    ]
+
+
+def test_summary_lists_company_names_only():
+    from src.notify import build_summary
+    from src.pipeline import Result
+
+    text = build_summary(_summary_results())
+    assert text == "seedreach: 2 new drafts: HillStar, alter.dev · 2 skipped · 1 error"
+    assert "@" not in text  # skip and error reasons can hold addresses: never included
+    assert build_summary([Result("a.dev", "skipped", "x")]) == "seedreach: no new drafts · 1 skipped"
+    assert build_summary([Result("a.dev", "drafted", "x", company="Acme")]) == (
+        "seedreach: 1 new draft: Acme · 0 skipped")
+
+
+def test_summary_posts_to_configured_channels_only():
+    import httpx
+    from src.notify import send_summary
+
+    sent = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append((str(request.url), json.loads(request.content)))
+        return httpx.Response(200)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    assert send_summary("hi", Settings(_env_file=None), client) == [] and sent == []  # nothing set: no call
+
+    settings = Settings(_env_file=None, telegram_bot_token="T0K", telegram_chat_id="42",
+                        discord_webhook_url="https://discord.test/hook")
+    assert send_summary("hi", settings, client) == ["Telegram", "Discord"]
+    assert sent == [("https://api.telegram.org/botT0K/sendMessage", {"chat_id": "42", "text": "hi"}),
+                    ("https://discord.test/hook", {"content": "hi"})]
+
+    sent.clear()  # a token without a chat id is not enough for Telegram
+    assert send_summary("hi", Settings(_env_file=None, telegram_bot_token="T0K"), client) == [] and sent == []
+
+
+def test_summary_send_failure_only_warns(caplog: pytest.LogCaptureFixture):
+    import httpx
+    from src.notify import send_summary
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "telegram" in request.url.host:
+            return httpx.Response(401)
+        raise httpx.ConnectError("down", request=request)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    settings = Settings(_env_file=None, telegram_bot_token="S3CRET", telegram_chat_id="42",
+                        discord_webhook_url="https://discord.test/hook/S3CRET")
+    with caplog.at_level("WARNING"):
+        assert send_summary("hi", settings, client) == []  # no exception
+    assert "Telegram summary not sent (HTTP 401)" in caplog.text
+    assert "Discord summary not sent (ConnectError)" in caplog.text
+    assert "S3CRET" not in caplog.text  # the URLs hold the secrets
+
+
+@pytest.mark.parametrize("args, sends", [([], True), (["--dry-run"], False)])
+def test_cli_run_sends_summary_even_when_every_attempt_failed(monkeypatch: pytest.MonkeyPatch, args, sends):
+    from types import SimpleNamespace as NS
+    from typer.testing import CliRunner
+
+    import main
+    from src.pipeline import Result
+
+    results = [Result("down.dev", "error", "extraction failed")]
+    monkeypatch.setattr(main, "_db", lambda: None)
+    monkeypatch.setattr(main, "_pipeline", lambda db, dry_run: NS(run=lambda *a, **k: results, traces=[]))
+    sent = []
+    monkeypatch.setattr(main, "send_summary", lambda text, settings: sent.append(text))
+
+    out = CliRunner().invoke(main.app, ["run", *args])
+    assert out.exit_code == 1, out.output  # the run still fails for schedulers
+    assert sent == (["seedreach: no new drafts · 0 skipped · 1 error"] if sends else [])

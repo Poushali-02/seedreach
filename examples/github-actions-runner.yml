@@ -38,7 +38,7 @@ env:
   # run code you trust. Use the release's commit ID, not its tag: a tag can be moved, a commit can't.
   # To upgrade, read the new release, run `git rev-parse vX.Y.Z^{commit}` in seedreach, put the result
   # here and update the version comment.
-  SEEDREACH_REF: 219ddfa18d2ec6bb052ee928569154521a19c740 # v0.3.2
+  SEEDREACH_REF: 96f26784acc6e3a9a906fb7f160c7e9685f2884c # v0.4.0
 
 jobs:
   run:
@@ -90,6 +90,10 @@ jobs:
           APOLLO_API_KEY: ${{ secrets.APOLLO_API_KEY }}
           YC_REGIONS: ${{ vars.YC_REGIONS }}            # optional repo variables, e.g. India,Remote
           PREFER_REGIONS: ${{ vars.PREFER_REGIONS }}
+          # Optional run summary (company names and counts only); unset secrets mean no message
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           LIMIT: ${{ inputs.limit || '5' }}
           SOURCE: ${{ inputs.source || 'all' }}
           DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
