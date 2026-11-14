@@ -1,0 +1,9 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "c7b691002c06854bbc6116679d6daa120e8654a3",
+  "branch": "docs/telegram-discord-setup",
+  "prompts": {},
+  "integrity": {"v":1,"commit":"c7b691002c06854bbc6116679d6daa120e8654a3","tree":"2519564095aeb8af3d6db5db53244478e750d502","files":{},"digest":"8220b8338da182c5c36390fc71b8f2a9b70444a7d909b5bb31e681a1d8113913"}
+}
