@@ -1,0 +1,9 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "2a4aed16031f951b6c6d32178264d52e3e8348c5",
+  "branch": "fix/resume-in-short-email",
+  "prompts": {},
+  "integrity": {"v":1,"commit":"2a4aed16031f951b6c6d32178264d52e3e8348c5","tree":"37e696219b0868755df40c487f5e07edcc6b0c95","files":{},"digest":"4f5769cc93824d85ffccd7665ef71fa091effdc00285fe395cf54f85b5a87f8b"}
+}
