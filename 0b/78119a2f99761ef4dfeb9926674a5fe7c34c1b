@@ -1,0 +1,9 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "0b78119a2f99761ef4dfeb9926674a5fe7c34c1b",
+  "branch": "feat/skip-non-software-46",
+  "prompts": {},
+  "integrity": {"v":1,"commit":"0b78119a2f99761ef4dfeb9926674a5fe7c34c1b","tree":"9749006d1f51002ca904444a4b5b2b15e809307d","files":{},"digest":"63aa1e056693cd75034273bf68992b2c12107edd9a671b530522d51552a326e6"}
+}
