@@ -48,7 +48,11 @@ python main.py run --limit 5
       the company's domain and naming the open internship, if any (`src/outreach/generator.py`).
    8. Saves it to Gmail Drafts (`src/outreach/gmail_client.py`) and records it in SQLite (`src/db.py`).
 3. The run stops after `--limit` drafts, or after `limit × 6` attempts to cap LLM spend.
-4. **After the run**, `run --digest FILE` writes the digest (`src/digest.py`): roles to apply for,
+4. **With `JOB_ALERTS=1`**, the run then reads your job-alert emails from the last `JOB_ALERT_DAYS`
+   (`src/sourcing/job_alerts.py`, one parser per sender; Gmail read-only scope). New internships go into
+   the digest with their apply links and are remembered in the `alert_jobs` table so each is listed
+   once. They don't enter the pipeline above: an alert names a company, not its website.
+5. **After the run**, `run --digest FILE` writes the digest (`src/digest.py`): roles to apply for,
    founders to reach on LinkedIn and drafts to review, with no email addresses; the scheduled-runs
    template posts it as a GitHub issue comment. If Telegram or Discord is configured, a one-line summary
    is sent too (`src/notify.py`).
@@ -79,7 +83,7 @@ python main.py run --limit 5
 | `src/sourcing/` | Lead sources: one module per source |
 | `src/intelligence/` | `scraper.py` (HTML to text) and `extractor.py` (LLM to `CompanyProfile`) |
 | `src/enrichment/` | `email_finder.py`, `job_boards.py` (open internships on public job boards) and `company_facts.py` (company size from Apollo) |
-| `src/outreach/` | `generator.py` (email text) and `gmail_client.py` (drafts only) |
+| `src/outreach/` | `generator.py` (email text) and `gmail_client.py` (creates drafts, never sends; reads job-alert emails only with `JOB_ALERTS=1`) |
 | `tests/test_core.py`, `tests/test_job_boards.py` | Tests; every network and LLM call is faked (job-board fixtures are recorded real responses) |
 
 ## Adding a lead source

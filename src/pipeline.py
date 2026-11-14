@@ -22,6 +22,7 @@ from src.outreach.gmail_client import GmailDraftClient, GmailError
 from src.profile import load_profile
 from src.sourcing.base import BaseSourcingProvider, Lead, parse_preferences, region_rank
 from src.sourcing.hacker_news import HackerNewsProvider
+from src.sourcing.job_alerts import AlertJob, read_alerts
 from src.sourcing.launch_hn import LaunchHNProvider
 from src.sourcing.product_hunt import ProductHuntProvider
 from src.sourcing.yc_directory import YCDirectoryProvider, yc_founders
@@ -129,7 +130,8 @@ class Pipeline:
         self.founder_pages: dict[str, str] = {}  # domain -> a page listing its founders (YC leads)
         self.yc_client = httpx.Client(timeout=settings.http_timeout, follow_redirects=True,
                                       headers={"User-Agent": settings.user_agent})
-        self.gmail = GmailDraftClient(settings.google_credentials_file, settings.google_token_file, settings.headless)
+        self.gmail = GmailDraftClient(settings.google_credentials_file, settings.google_token_file, settings.headless,
+                                      read_mail=settings.job_alerts)
         if not dry_run:
             self.gmail.ensure_authenticated()  # fail before spending LLM credits
 
@@ -287,6 +289,23 @@ class Pipeline:
         self._record("INFO", domain, f"drafted to {email.email} via {email.source}{role_note}")
         return Result(domain, "drafted", f"{email.source}: {email.confidence}{role_note}", draft, email.email,
                       **about)
+
+    def job_alerts(self) -> list[AlertJob]:
+        """Openings from your job-alert emails that no earlier run has listed (empty unless JOB_ALERTS=1).
+
+        A problem reading mail is logged and gives an empty list: alerts must never fail a run.
+        """
+        if not self.settings.job_alerts:
+            return []
+        try:
+            jobs = read_alerts(self.gmail, self.settings.job_alert_days,
+                               internships_only=self.settings.job_alert_internships_only)
+        except GmailError as exc:
+            log.warning("Job alerts not read: %s", exc)
+            return []
+        if self.dry_run:  # dry runs record nothing, so the next real run still lists these
+            return [j for j in jobs if not self.db.alert_job_seen(j.apply_url)]
+        return [j for j in jobs if self.db.add_alert_job(j.portal, j.company, j.role, j.apply_url, j.location)]
 
     def run(self, limit: int, source: str = "all", on_result: Optional[Reporter] = None) -> list[Result]:
         """Process queued targets first, then fresh leads, until `limit` drafts exist."""

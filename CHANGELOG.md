@@ -5,6 +5,16 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+### Added
+- Job-alert emails (#36): with `JOB_ALERTS=1`, each run reads the alert emails a job portal sent you
+  (Naukri so far) and lists every new internship in the digest under *From your job alerts*, with the
+  company, role, place and apply link. Each opening is listed once. Off by default.
+  - Needs Gmail's read-only permission, asked for only when the setting is on; the first run after
+    turning it on signs you in again. On a server, replace the saved `token.json` afterwards.
+  - Apply links are saved without their tracking part (it carries your portal user id).
+  - These openings don't become drafts: an alert names a company, not its website.
+  - `JOB_ALERT_DAYS` (3) sets how far back to look; `JOB_ALERT_INTERNSHIPS_ONLY=0` keeps every role.
+
 ## [0.5.2] - 2026-11-14
 
 No more drafts to help desks: support inboxes are ignored, and YC companies get their founders from YC.

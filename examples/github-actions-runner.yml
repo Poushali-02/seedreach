@@ -90,6 +90,9 @@ jobs:
           APOLLO_API_KEY: ${{ secrets.APOLLO_API_KEY }}
           YC_REGIONS: ${{ vars.YC_REGIONS }}            # optional repo variables, e.g. India,Remote
           PREFER_REGIONS: ${{ vars.PREFER_REGIONS }}
+          # Optional repo variable: 1 lists new internships from your job-alert emails in the digest.
+          # GMAIL_TOKEN must then come from a sign-in made with JOB_ALERTS=1 (it needs read access).
+          JOB_ALERTS: ${{ vars.JOB_ALERTS || '0' }}
           # Optional run summary (company names and counts only); unset secrets mean no message
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
