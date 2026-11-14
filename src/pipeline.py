@@ -22,7 +22,7 @@ from src.outreach.gmail_client import GmailDraftClient, GmailError
 from src.profile import load_profile
 from src.sourcing.base import BaseSourcingProvider, Lead, parse_preferences, region_rank
 from src.sourcing.hacker_news import HackerNewsProvider
-from src.sourcing.job_alerts import AlertJob, read_alerts
+from src.sourcing.job_alerts import AlertJob, gmail_query, jobs_in
 from src.sourcing.launch_hn import LaunchHNProvider
 from src.sourcing.product_hunt import ProductHuntProvider
 from src.sourcing.yc_directory import YCDirectoryProvider, yc_founders
@@ -298,14 +298,20 @@ class Pipeline:
         if not self.settings.job_alerts:
             return []
         try:
-            jobs = read_alerts(self.gmail, self.settings.job_alert_days,
-                               internships_only=self.settings.job_alert_internships_only)
+            emails = self.gmail.messages(gmail_query(self.settings.job_alert_days), 30)
         except GmailError as exc:
             log.warning("Job alerts not read: %s", exc)
             return []
+        every = jobs_in(emails, internships_only=False)
+        jobs = jobs_in(emails, internships_only=self.settings.job_alert_internships_only)
         if self.dry_run:  # dry runs record nothing, so the next real run still lists these
-            return [j for j in jobs if not self.db.alert_job_seen(j.apply_url)]
-        return [j for j in jobs if self.db.add_alert_job(j.portal, j.company, j.role, j.apply_url, j.location)]
+            new = [j for j in jobs if not self.db.alert_job_seen(j.apply_url)]
+        else:
+            new = [j for j in jobs if self.db.add_alert_job(j.portal, j.company, j.role, j.apply_url, j.location)]
+        # always said, so "nothing new" can be told apart from "mail was never read"
+        log.info("Job alerts: read %d email(s) from the last %d day(s): %d opening(s), %d kept, %d new",
+                 len(emails), self.settings.job_alert_days, len(every), len(jobs), len(new))
+        return new
 
     def run(self, limit: int, source: str = "all", on_result: Optional[Reporter] = None) -> list[Result]:
         """Process queued targets first, then fresh leads, until `limit` drafts exist."""

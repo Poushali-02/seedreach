@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Callable, Iterable, Protocol
+from typing import Callable, Iterable
 from urllib.parse import urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
@@ -37,10 +37,6 @@ class AlertMessage:
     """One email, as the Gmail client hands it over."""
     sender: str  # bare address, lower-cased
     html: str
-
-
-class _Mailbox(Protocol):  # what this module needs from the Gmail client
-    def messages(self, query: str, limit: int) -> list[AlertMessage]: ...
 
 
 def _without_query(url: str) -> str:
@@ -103,7 +99,3 @@ def jobs_in(messages: Iterable[AlertMessage], *, internships_only: bool = True) 
             seen.add(job.apply_url)
             jobs.append(job)
     return jobs
-
-
-def read_alerts(mailbox: _Mailbox, days: int, *, internships_only: bool = True, limit: int = 30) -> list[AlertJob]:
-    return jobs_in(mailbox.messages(gmail_query(days), limit), internships_only=internships_only)
