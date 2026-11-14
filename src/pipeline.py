@@ -8,6 +8,8 @@ from datetime import date, datetime, timezone
 from typing import Callable, Iterator, Optional
 from urllib.parse import urlparse
 
+import httpx
+
 from src.config import Settings
 from src.db import Database
 from src.enrichment.email_finder import EmailFinder, EmailResult
@@ -22,7 +24,7 @@ from src.sourcing.base import BaseSourcingProvider, Lead, parse_preferences, reg
 from src.sourcing.hacker_news import HackerNewsProvider
 from src.sourcing.launch_hn import LaunchHNProvider
 from src.sourcing.product_hunt import ProductHuntProvider
-from src.sourcing.yc_directory import YCDirectoryProvider
+from src.sourcing.yc_directory import YCDirectoryProvider, yc_founders
 from src.trace import Trace, name_in_text
 from src.utils import domain_of, non_company_kind, normalize_url
 
@@ -124,6 +126,9 @@ class Pipeline:
         self.finder = EmailFinder(settings)
         self.boards = JobBoardChecker(settings.http_timeout)
         self.company_facts = CompanyFactsClient(settings.apollo_api_key, settings.http_timeout)
+        self.founder_pages: dict[str, str] = {}  # domain -> a page listing its founders (YC leads)
+        self.yc_client = httpx.Client(timeout=settings.http_timeout, follow_redirects=True,
+                                      headers={"User-Agent": settings.user_agent})
         self.gmail = GmailDraftClient(settings.google_credentials_file, settings.google_token_file, settings.headless)
         if not dry_run:
             self.gmail.ensure_authenticated()  # fail before spending LLM credits
@@ -212,6 +217,15 @@ class Pipeline:
             company = company.model_copy(update={"founder_first_name": None, "founder_last_name": None})
 
         founder = " ".join(p for p in (company.founder_first_name, company.founder_last_name) if p) or None
+        if founder is None and (page_url := self.founder_pages.get(domain)):
+            # the site names no founder, but YC lists them: reach that person instead of a team inbox
+            listed = yc_founders(page_url, self.yc_client)
+            if listed:
+                founder = listed[0][0]
+                first, _, last = founder.partition(" ")
+                company = company.model_copy(update={"founder_first_name": first,
+                                                      "founder_last_name": last or None})
+                self._record("INFO", domain, f"founder from YC: {founder} ({listed[0][1] or 'founder'})")
 
         # an open internship matters most when there's no good address to write to, so read the job
         # board before the email checks: skipped companies keep their apply link too
@@ -312,5 +326,7 @@ class Pipeline:
             if domain in seen or self.db.is_known(domain):
                 continue
             seen.add(domain)
+            if lead.founders_url:
+                self.founder_pages[domain] = lead.founders_url
             handle(lead.url, lead.source, lead.name_hint)
         return results

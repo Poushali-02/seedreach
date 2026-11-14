@@ -5,6 +5,15 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+### Fixed
+- No more drafts to support inboxes. Only a few exact names (`support@`, `billing@`, ...) were ignored, so
+  addresses like `refunds@` and `loansupport@` counted as a person's own: real runs drafted to xPay's
+  refunds inbox and ClickPe's loan-support inbox. Any address whose name contains a support or role word
+  (support, refund, billing, customer, grievance, privacy, ...) is now ignored.
+- YC companies whose site names no founder now use the founders listed on their YC page (CEO first), so
+  they land under *Needs a contact* with the founder's name and a LinkedIn link instead of getting a
+  draft to a team inbox.
+
 ## [0.5.1] - 2026-11-14
 
 Your resume link is now in every draft.

@@ -17,6 +17,8 @@ class Lead:
     # where the company says it hires, when the source knows (YC's region names, "Remote" for HN's
     # remote-only roles). Empty means unknown. Used only to rank leads with PREFER_REGIONS.
     regions: tuple[str, ...] = ()
+    # a page that lists the company's founders, when the source knows one (the company's YC page)
+    founders_url: Optional[str] = None
 
 
 def parse_preferences(raw: str) -> tuple[str, ...]:

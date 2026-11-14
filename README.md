@@ -187,7 +187,11 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
   then a generic inbox (`hello@`). A bare `{first}@domain` guess is **not drafted**: the company is listed
   under *Needs a contact* in `status` so you can find an address and retry with `target <url> --force`
   (`ALLOW_GUESSED_EMAILS=1` restores the old behaviour). A founder the model names is only used if the
-  site itself names them.
+  site itself names them. For YC companies whose site names no founder, the founders listed on the
+  company's YC page are used instead (the CEO first).
+- **Support inboxes are never drafted to**: addresses like `refunds@`, `loansupport@`, `billing@`,
+  `customercare@` or `support@` reach a help desk, not a founder, so they're ignored even when they're the
+  only address on the site.
 - **Generic inboxes**: when the site names a founder but the only address is a generic one (`hello@`,
   `info@`, `contact@`, `team@`), the company goes under *Needs a contact* instead of being drafted, because
   those inboxes rarely reach the founder. `status` lists the founder with a LinkedIn search link, so you can
@@ -223,23 +227,23 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
 
 Measured on 30 real startups that seedreach found, each checked by hand against its website (company
 name, domain, every founder the site names, and whether every claim in the opening line is true).
-Model: `gemini-flash-lite-latest`, 3 runs, 2026-11-01.
+Model: `gemini-flash-lite-latest`, 2 runs, 2026-11-14 (v0.5.0).
 
 | Metric | Score | What it means |
 |---|---|---|
 | Company name | 96% | Right name for the company |
-| Domain | 85–89% | Right category, so the right project of yours gets pitched |
-| Founder correct | 93–100% | One of the site's founders, or correctly none when the site names no founder |
-| Invented founder | 0–4% | Named someone the site doesn't call a founder (the worst mistake: a wrong name in the greeting) |
-| Opening line follows the rules | 93–96% | One sentence, no flattery, no markdown |
-| Same answers on every run | 83% | Same domain and founder each time on the same page |
-| Ready to send | 63–70% | Everything above right at once, on the right website |
+| Domain | 89–93% | Right category, so the right project of yours gets pitched |
+| Founder correct | 89–93% | One of the site's founders, or correctly none when the site names no founder |
+| Invented founder | 4–7% | Named someone the site doesn't call a founder (the worst mistake: a wrong name in the greeting) |
+| Opening line follows the rules | 100% | One sentence, no flattery, no markdown |
+| Wrong website caught | 100% | A news article or job posting is recognised and skipped, not drafted |
+| Software startups skipped | 0 | Real software startups wrongly skipped as "not software" (must stay 0) |
+| Same answers on every run | 93% | Same domain and founder each time on the same page |
+| Ready to send | 70–73% | Everything above right at once, on the right website |
 
-The opening lines in this run haven't been checked by hand yet (the last check found every claim true in
-93% of them), so "ready to send" counts only the rule checks and is a little high.
-
-These numbers predate v0.3.1, which stopped drafting for news articles and job-board pages (3 of the 30
-leads pointed at one). They'll be re-measured for v0.4.0.
+The opening lines in these runs haven't been checked by hand (the last check found every claim true in
+93% of them), so "ready to send" counts only the rule checks and is a little high. With 30 startups, one
+company is about 3–4 points, so differences of a point or two between versions are noise.
 
 How it got here, on the same 30 startups:
 

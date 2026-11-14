@@ -18,29 +18,40 @@ python main.py run --limit 5
 ```
 
 1. **Leads.** `Pipeline.run` (in `src/pipeline.py`) first processes companies queued with `add-target`,
-   then pulls leads from the sources, one from each in turn (`interleave`). Companies already in the
-   database, or already seen in this run, are skipped at no cost.
+   then pulls leads from the sources, one from each in turn (`interleave`). With `PREFER_REGIONS` set,
+   `ranked_interleave` takes the best-ranked lead waiting at the front of any source instead (for example
+   India first, then remote). Companies already in the database, or already seen in this run, are skipped
+   at no cost.
 2. **For each lead**, `Pipeline.process`:
    1. Normalises the URL to a domain and checks the database. A company that was drafted or skipped
       before counts as a `duplicate` and is never contacted twice.
    2. With an Apollo key, looks up the company's headcount and skips it if it's over `MAX_EMPLOYEES`,
       before any scraping or LLM call (`src/enrichment/company_facts.py`). Unknown companies are kept.
    3. Scrapes the homepage plus up to two About or Team pages (`src/intelligence/scraper.py`).
-   4. Asks the LLM for a structured `CompanyProfile`: name, summary, domain, founder name and a
-      one-line technical opener (`src/intelligence/extractor.py`). The output is validated with
-      Pydantic and retried once if invalid.
-   5. Finds an email, best first: Apollo-verified (if configured), the founder's own address on the
+   4. Asks the LLM for a structured `CompanyProfile`: name, summary, domain, founder name, what the
+      company sells and a one-line technical opener (`src/intelligence/extractor.py`). The output is
+      validated with Pydantic and retried once if invalid. A news article or job posting is skipped, and
+      so is a company that clearly isn't software (`clearly_not_software`: not software **and** domain
+      "Other", unless `SKIP_NON_SOFTWARE=0`). A founder the page doesn't actually name is dropped; for a
+      YC lead whose site names none, the founders on its YC page are used (`yc_founders`, CEO first).
+   5. If the site links to a Greenhouse, Lever or Ashby job board, reads it for open internships and
+      picks an engineering, AI or data one posted in the last `MAX_ROLE_AGE_DAYS` (60) days
+      (`src/enrichment/job_boards.py`). This happens before the email checks, so a company skipped for
+      lack of an address still keeps its apply link. A board that can't be read is logged with a reason.
+   6. Finds an email, best first: Apollo-verified (if configured), the founder's own address on the
       site, the founder's name in the site's address format, anyone's address on the site, a generic
-      inbox (`src/enrichment/email_finder.py`). A bare `{first}@domain` guess is recorded as
+      inbox (`src/enrichment/email_finder.py`). Support and role inboxes (`refunds@`, `support@`,
+      `billing@`, ...) are never used (`is_role_inbox`). A bare `{first}@domain` guess is recorded as
       "needs contact" instead of drafted, unless `ALLOW_GUESSED_EMAILS` is set. So is a generic inbox
-      (`hello@`, `info@`) when the site names a founder, unless `GENERIC_INBOX` says otherwise.
-   6. If the site links to a Greenhouse, Lever or Ashby job board, reads it for open internships and
-      picks an engineering, AI or data one to name in the draft (`src/enrichment/job_boards.py`).
-      A board that can't be read is logged with a reason and never stops the draft.
+      (`hello@`, `info@`) when a founder is known, unless `GENERIC_INBOX` says otherwise.
    7. Writes a plain-text draft from your `profile.json`, choosing the project paragraph that matches
-      the company's domain (`src/outreach/generator.py`).
+      the company's domain and naming the open internship, if any (`src/outreach/generator.py`).
    8. Saves it to Gmail Drafts (`src/outreach/gmail_client.py`) and records it in SQLite (`src/db.py`).
 3. The run stops after `--limit` drafts, or after `limit × 6` attempts to cap LLM spend.
+4. **After the run**, `run --digest FILE` writes the digest (`src/digest.py`): roles to apply for,
+   founders to reach on LinkedIn and drafts to review, with no email addresses; the scheduled-runs
+   template posts it as a GitHub issue comment. If Telegram or Discord is configured, a one-line summary
+   is sent too (`src/notify.py`).
 
 ### What gets recorded
 
@@ -64,6 +75,7 @@ python main.py run --limit 5
 | `src/trace.py` | `Trace`: one company's run, step by step (time, tokens, pages read, text cut, founder on the page) |
 | `src/pipeline.py` | Orchestration, source registry (`build_providers`), `interleave` |
 | `src/digest.py` | The run digest (`run --digest`): roles to apply for, founders to reach, drafts to review |
+| `src/notify.py` | The optional one-line run summary to Telegram or Discord |
 | `src/sourcing/` | Lead sources: one module per source |
 | `src/intelligence/` | `scraper.py` (HTML to text) and `extractor.py` (LLM to `CompanyProfile`) |
 | `src/enrichment/` | `email_finder.py`, `job_boards.py` (open internships on public job boards) and `company_facts.py` (company size from Apollo) |
