@@ -7,7 +7,7 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [0.5.1] - 2026-11-14
 
-Your resume link is back in every draft.
+Your resume link is now in every draft.
 
 ### Fixed
 - Short emails (the default style) now include your resume link. They showed only the first two of
