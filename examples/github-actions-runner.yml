@@ -38,7 +38,7 @@ env:
   # run code you trust. Use the release's commit ID, not its tag: a tag can be moved, a commit can't.
   # To upgrade, read the new release, run `git rev-parse vX.Y.Z^{commit}` in seedreach, put the result
   # here and update the version comment.
-  SEEDREACH_REF: 9a1cf0f29785e43d0e2cf75a7a3ad3d0cb1cd500 # v0.5.1
+  SEEDREACH_REF: 7fc25464630ffbbb57696196c8e9ed491037e67c # v0.5.2
 
 jobs:
   run:
