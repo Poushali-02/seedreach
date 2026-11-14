@@ -13,7 +13,7 @@ from src.db import Database
 from src.enrichment.email_finder import EmailFinder, EmailResult
 from src.enrichment.company_facts import CompanyFactsClient
 from src.enrichment.job_boards import JobBoardChecker
-from src.intelligence.extractor import ExtractionError, Extractor
+from src.intelligence.extractor import ExtractionError, Extractor, clearly_not_software
 from src.intelligence.scraper import ScrapeError, Scraper
 from src.outreach.generator import EmailDraft, generate_email
 from src.outreach.gmail_client import GmailDraftClient, GmailError
@@ -33,6 +33,7 @@ Reporter = Callable[["Result"], None]
 NEEDS_CONTACT = "needs contact"  # skip reason prefix: a company worth writing to, but no address we trust
 FOUNDER_INBOXES = {"founders", "founder"}  # generic-looking, but they reach the founders
 _PAGE_KIND = {"job_board": "a job-board page", "news": "a news article", "other": "not a company website"}
+_BUSINESS = {"hardware": "makes hardware", "services": "sells a service", "other": "doesn't sell software"}
 
 
 def _not_company_site(kind: str, company: Optional[str] = None) -> str:
@@ -198,6 +199,13 @@ class Pipeline:
             trace.input_tokens, trace.output_tokens = usage.input_tokens, usage.output_tokens
         if company.page_type != "company":  # an article or posting about them, not their site
             return self._skip(domain, url, source, _not_company_site(company.page_type, company.company_name),
+                              company_name=company.company_name)
+        if self.settings.skip_non_software and clearly_not_software(company):
+            # before the job board and email lookups, so nothing more is spent on it
+            what = _BUSINESS.get(company.business_type, company.business_type)
+            return self._skip(domain, url, source,
+                              f"not a software company: {what} ({company.one_line_summary})"
+                              "; set SKIP_NON_SOFTWARE=0 to keep these",
                               company_name=company.company_name)
         trace.founder_in_text = name_in_text(company.founder_first_name, company.founder_last_name, page.text)
         if trace.founder_in_text is False:  # named from memory, not the page: greet the team instead

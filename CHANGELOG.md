@@ -23,6 +23,15 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   people"). Headcount is used rather than funding stage, because Apollo labels Ramp, Vercel and Stripe
   all "Venture (Round not Specified)".
 
+- Companies that clearly don't sell software are skipped (#46). The model already reads each site, so it
+  now also says what the company mainly sells (software, hardware, services or other). A company is
+  recorded as skipped, before the job board and email lookups, only when that answer isn't software
+  **and** its domain is "Other", with the reason ("not a software company: sells a service (Laundry
+  pickup and delivery.)"). Both must agree because the model sometimes calls an AI device "hardware"
+  while filing it under AI Agents. Software sold to any industry counts as software, and when the model
+  is unsure it answers software. `SKIP_NON_SOFTWARE=0` turns it off. The evals report software startups
+  that would be skipped, which must stay at zero.
+
 - Internships first posted more than 60 days ago aren't named (`MAX_ROLE_AGE_DAYS`, 0 for no limit).
   Job boards list every posting the company hasn't taken down, and some stay up for years: Palantir's
   Lever board still lists openings from 2024. seedreach now reads each posting's date (Greenhouse
