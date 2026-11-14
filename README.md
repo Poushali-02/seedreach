@@ -311,7 +311,21 @@ means no comment.
 
 For a one-line summary on Telegram or Discord as well ("3 new drafts: HillStar, Alter · 2 skipped"), add
 the secrets `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, and/or `DISCORD_WEBHOOK_URL`. It lists company
-names and counts only, never founder addresses or draft text.
+names and counts only, never founder addresses or draft text. It's sent after real runs, not dry runs.
+
+- **Telegram**: message [@BotFather](https://t.me/BotFather), send `/newbot` and follow the prompts; it
+  replies with the bot token. Send any message to your new bot, then open
+  `https://api.telegram.org/bot<token>/getUpdates` in a browser: the number after `"chat":{"id":` is your
+  chat ID.
+- **Discord**: in your server, Server Settings > Integrations > Webhooks > New Webhook, then Copy Webhook URL.
+
+Save each one as a secret (paste the value when prompted; don't put it in a file in the repo):
+
+```bash
+gh secret set TELEGRAM_BOT_TOKEN -R you/seedreach-runner
+gh secret set TELEGRAM_CHAT_ID -R you/seedreach-runner
+gh secret set DISCORD_WEBHOOK_URL -R you/seedreach-runner
+```
 
 Control: change the `cron:` line for timing, use **Run workflow** for an on-demand run with its own
 limit and source, and **Disable workflow** to pause. GitHub emails you when a run fails (for example,
