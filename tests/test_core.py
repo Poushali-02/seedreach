@@ -535,6 +535,60 @@ def test_run_ranks_sources_only_when_prefer_regions_is_set(tmp_path: Path, monke
     assert run(Settings(prefer_regions="India,Remote")) == ["https://i.dev", "https://h.dev", "https://u.dev"]
 
 
+
+def test_role_inboxes_are_never_used():
+    from src.enrichment.email_finder import EmailFinder, is_role_inbox
+
+    for local in ("refunds", "loansupport", "customercare", "billing", "support", "help", "noreply",
+                  "grievance.officer", "privacy-team", "sales"):
+        assert is_role_inbox(local), local
+    for local in ("aniket", "shashwat.s", "ada", "hello", "founders", "team"):
+        assert not is_role_inbox(local), local
+    # xPay's and ClickPe's sites print only support addresses: neither is drafted to as a person
+    personal, generic = EmailFinder._site_addresses(
+        "xpaycheckout.com", ["refunds@xpaycheckout.com", "loansupport@xpaycheckout.com"])
+    assert personal == [] and generic == []
+
+
+def test_yc_founders_are_read_from_the_company_page():
+    import html as html_mod
+    import json as json_mod
+    import httpx
+    from src.sourcing.yc_directory import yc_founders
+
+    props = {"component": "CompanyShowPage", "props": {"company": {"founders": [
+        {"full_name": "Rakshit Bansal", "title": "Founder"},
+        {"full_name": "Aniket Gupta", "title": "Founder/CEO"}]}}}
+    page = f'<div id="app" data-page="{html_mod.escape(json_mod.dumps(props))}"></div>'
+    ok = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, text=page)))
+    assert yc_founders("https://www.ycombinator.com/companies/xpay", ok) == [
+        ("Aniket Gupta", "Founder/CEO"), ("Rakshit Bansal", "Founder")]  # CEO first
+    down = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(503)))
+    assert yc_founders("https://www.ycombinator.com/companies/xpay", down) == []
+    junk = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, text="<html></html>")))
+    assert yc_founders("https://www.ycombinator.com/companies/xpay", junk) == []
+
+
+def test_yc_founder_turns_a_team_inbox_into_needs_contact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    import src.pipeline as pipeline
+    from types import SimpleNamespace as NS
+    from src.enrichment.email_finder import EmailResult
+
+    pipe = _traced_pipeline(tmp_path, "Shiplog builds changelogs.")  # the site names no founder
+    real = pipe.extractor.extract
+    pipe.extractor.extract = lambda page, hint: real(page, hint).model_copy(
+        update={"founder_first_name": None, "founder_last_name": None})
+    pipe.finder = NS(find=lambda *a: EmailResult("hello@useshiplog.com", "mailto", "generic"))
+    monkeypatch.setattr(pipeline, "yc_founders", lambda url, client: [("Aniket Gupta", "Founder/CEO")])
+    pipe.founder_pages = {"useshiplog.com": "https://www.ycombinator.com/companies/shiplog"}
+    r = pipe.process("https://useshiplog.com", "yc")
+    assert r.outcome == "skipped" and r.founder == "Aniket Gupta"
+    assert r.detail.startswith("needs contact: only a generic inbox (hello@useshiplog.com); reach Aniket Gupta")
+
+    pipe.founder_pages = {}  # not a YC lead: the team inbox is drafted as before ("Hi Shiplog team,")
+    assert pipe.process("https://useshiplog2.com", "hn").outcome == "drafted"
+
+
 # ---- CLI ---------------------------------------------------------------
 def test_cli_starts_and_lists_commands():
     # Imported here so a broken main.py (e.g. a SyntaxError) fails this test by name.
@@ -667,6 +721,7 @@ def _traced_pipeline(tmp_path: Path, founder_text: str):
 
     pipe = pipeline.Pipeline.__new__(pipeline.Pipeline)
     pipe.settings, pipe.db, pipe.dry_run = Settings(), Database(tmp_path / "t.db"), False
+    pipe.founder_pages, pipe.yc_client = {}, None
     pipe.run_id, pipe.traces, pipe.profile = "run-1", [], PROFILE
     pipe.scraper = NS(fetch=lambda url: ScrapedPage(
         url=url, domain="useshiplog.com", text=founder_text, pages=[url, url + "/about"], truncated=True))

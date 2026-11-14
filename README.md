@@ -187,7 +187,11 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
   then a generic inbox (`hello@`). A bare `{first}@domain` guess is **not drafted**: the company is listed
   under *Needs a contact* in `status` so you can find an address and retry with `target <url> --force`
   (`ALLOW_GUESSED_EMAILS=1` restores the old behaviour). A founder the model names is only used if the
-  site itself names them.
+  site itself names them. For YC companies whose site names no founder, the founders listed on the
+  company's YC page are used instead (the CEO first).
+- **Support inboxes are never drafted to**: addresses like `refunds@`, `loansupport@`, `billing@`,
+  `customercare@` or `support@` reach a help desk, not a founder, so they're ignored even when they're the
+  only address on the site.
 - **Generic inboxes**: when the site names a founder but the only address is a generic one (`hello@`,
   `info@`, `contact@`, `team@`), the company goes under *Needs a contact* instead of being drafted, because
   those inboxes rarely reach the founder. `status` lists the founder with a LinkedIn search link, so you can
