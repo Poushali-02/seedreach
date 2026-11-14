@@ -1,0 +1,9 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "ca69ba8d3ca9da8ddadd301ad47ee63fbe150486",
+  "branch": "fix/role-inboxes-yc-founders",
+  "prompts": {},
+  "integrity": {"v":1,"commit":"ca69ba8d3ca9da8ddadd301ad47ee63fbe150486","tree":"5347bbbe88da9e3f8607f635793ff21c88f0d3c8","files":{},"digest":"89da8c621089a1dca2b577bc0e7952bda6c995c336e8cd663e288a46fd6f8ac8"}
+}
