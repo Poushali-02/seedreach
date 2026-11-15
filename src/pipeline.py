@@ -217,7 +217,7 @@ class Pipeline:
                               f"not a software company: {what} ({company.one_line_summary})"
                               "; set SKIP_NON_SOFTWARE=0 to keep these",
                               company_name=company.company_name)
-        if not getattr(self, "include_large", False) and company.stage == "growth/large":
+        if not self.include_large and company.stage == "growth/large":
             return self._skip(domain, url, source, f"{company.company_name} is growth/large stage",
                               company_name=company.company_name)
         trace.founder_in_text = name_in_text(company.founder_first_name, company.founder_last_name, page.text)

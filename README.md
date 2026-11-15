@@ -141,7 +141,7 @@ python main.py run --limit 5 --digest digest.md   # also write a short summary: 
 
 # Queue your own list; the next `run` processes these before sourced leads
 python main.py add-target site1.com site2.io
-python main.py add-target --csv companies.csv   # reads a url or website column
+python main.py add-target --csv companies.csv   # reads a url or website column (see examples/targets.example.csv)
 
 # One specific startup, start to finish
 python main.py target https://example-startup.com

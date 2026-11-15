@@ -111,7 +111,7 @@ def run(
                                           "to apply for, founders to reach, drafts to review (no email addresses)."),
 ) -> None:
     """Fetch new leads, enrich them, and save drafts to Gmail."""
-    pipe = _pipeline(_db(), dry_run, include_large=include_large) if include_large else _pipeline(_db(), dry_run)
+    pipe = _pipeline(_db(), dry_run, include_large=include_large)
     try:
         results = pipe.run(limit, source, on_result=_report)
     except ValueError as exc:
@@ -141,7 +141,7 @@ def target(
                                        "skipping them. (Does not unskip previously skipped companies; use --force for that.)"),
 ) -> None:
     """Run the full pipeline for one specific startup."""
-    pipe = _pipeline(_db(), dry_run, include_large=include_large) if include_large else _pipeline(_db(), dry_run)
+    pipe = _pipeline(_db(), dry_run, include_large=include_large)
     result = pipe.process(url, "manual", force=force)
     _report(result)
     if result.outcome == "error":
@@ -191,7 +191,8 @@ def add_target(
         if not csv.is_file():
             console.print(f"[red]File not found: {csv}[/red]")
             raise typer.Exit(1)
-        with csv.open("r", encoding="utf-8-sig", errors="replace") as f:
+        # newline="": the csv module's own line handling, so a line break inside a quoted cell stays in the cell
+        with csv.open("r", encoding="utf-8-sig", errors="replace", newline="") as f:
             reader = csv_mod.DictReader(f)
             if not reader.fieldnames:
                 console.print(f"[red]Empty CSV file: {csv}[/red]")
