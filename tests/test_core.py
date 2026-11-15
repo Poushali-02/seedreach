@@ -668,6 +668,23 @@ def test_add_target_csv_import_and_skips_bad_rows(tmp_path: Path, monkeypatch):
     assert db.status_of("already.com") == "drafted"
 
 
+def test_add_target_csv_keeps_a_line_break_inside_a_cell(tmp_path: Path, monkeypatch):
+    from typer.testing import CliRunner
+
+    import main
+
+    db = Database(tmp_path / "test.db")
+    monkeypatch.setattr(main, "_db", lambda: db)
+    csv_file = tmp_path / "notes.csv"
+    # a "notes" cell with a line break in it, as a spreadsheet exports it (CRLF rows, quoted cell)
+    csv_file.write_bytes(b'notes,url\r\n"first line\r\nsecond line",https://site1.com\r\nplain,https://site2.com\r\n')
+
+    result = CliRunner().invoke(main.app, ["add-target", "--csv", str(csv_file)])
+    assert result.exit_code == 0, result.output
+    assert "Done: 2 queued, 0 already tracked, 0 invalid." in result.output
+    assert db.status_of("site1.com") == "queued" and db.status_of("site2.com") == "queued"
+
+
 def test_add_target_csv_website_column(tmp_path: Path, monkeypatch):
     from typer.testing import CliRunner
 
@@ -1363,7 +1380,7 @@ def test_run_writes_the_digest_file(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     found = [Result("ramp.com", "drafted", "ok", company="Ramp", role="Backend Intern",
                     apply_url="https://jobs.ashbyhq.com/ramp/1")]
-    monkeypatch.setattr(main, "_pipeline", lambda db, dry_run: NS(run=lambda *a, **k: found, job_alerts=lambda: [], traces=[]))
+    monkeypatch.setattr(main, "_pipeline", lambda db, dry_run, **kw: NS(run=lambda *a, **k: found, job_alerts=lambda: [], traces=[]))
     monkeypatch.setattr(main, "_db", lambda: None)
     out = tmp_path / "digest.md"
     assert CliRunner().invoke(main.app, ["run", "--dry-run", "--digest", str(out)]).exit_code == 0
@@ -1451,7 +1468,7 @@ def test_cli_run_sends_summary_even_when_every_attempt_failed(monkeypatch: pytes
 
     results = [Result("down.dev", "error", "extraction failed")]
     monkeypatch.setattr(main, "_db", lambda: None)
-    monkeypatch.setattr(main, "_pipeline", lambda db, dry_run: NS(run=lambda *a, **k: results, job_alerts=lambda: [], traces=[]))
+    monkeypatch.setattr(main, "_pipeline", lambda db, dry_run, **kw: NS(run=lambda *a, **k: results, job_alerts=lambda: [], traces=[]))
     sent = []
     monkeypatch.setattr(main, "send_summary", lambda text, settings: sent.append(text))
 
