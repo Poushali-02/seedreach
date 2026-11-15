@@ -720,7 +720,7 @@ def _traced_pipeline(tmp_path: Path, founder_text: str):
             return _company("DevTools")
 
     pipe = pipeline.Pipeline.__new__(pipeline.Pipeline)
-    pipe.settings, pipe.db, pipe.dry_run = Settings(), Database(tmp_path / "t.db"), False
+    pipe.settings, pipe.db, pipe.dry_run, pipe.include_large = Settings(), Database(tmp_path / "t.db"), False, False
     pipe.founder_pages, pipe.yc_client = {}, None
     pipe.run_id, pipe.traces, pipe.profile = "run-1", [], PROFILE
     pipe.scraper = NS(fetch=lambda url: ScrapedPage(
@@ -825,6 +825,36 @@ def test_model_flagged_article_is_skipped(tmp_path: Path):
     pipe.extractor.extract = lambda page, hint: real(page, hint).model_copy(update={"page_type": "news"})
     r = pipe.process("https://some-blog.dev/acme-raises", "hn")
     assert r.outcome == "skipped" and "a news article about Shiplog" in r.detail
+
+
+def test_model_flagged_growth_large_company_is_skipped(tmp_path: Path):
+    pipe = _traced_pipeline(tmp_path, "Ada")
+    real = pipe.extractor.extract
+    pipe.extractor.extract = lambda page, hint: real(page, hint).model_copy(update={"stage": "growth/large"})
+    r = pipe.process("https://useshiplog.com", "hn")
+    assert r.outcome == "skipped" and "is growth/large stage" in r.detail
+
+
+def test_early_and_unknown_stages_are_not_skipped(tmp_path: Path):
+    pipe = _traced_pipeline(tmp_path, "Shiplog was started by Ada.")
+    real = pipe.extractor.extract
+    from types import SimpleNamespace as NS
+    from src.enrichment.email_finder import EmailResult
+
+    for i, stage in enumerate(("unknown", "pre-seed/seed", "early")):
+        pipe.extractor.extract = lambda page, hint, s=stage: real(page, hint).model_copy(update={"stage": s})
+        pipe.finder = NS(find=lambda *a, idx=i: EmailResult(f"founder{idx}@example.com", "heuristic", "pattern from site"))
+        r = pipe.process(f"https://stage-test-{i}.dev", "hn")
+        assert r.outcome == "drafted"
+
+
+def test_include_large_flag_allows_growth_large_company(tmp_path: Path):
+    pipe = _traced_pipeline(tmp_path, "Shiplog was started by Ada.")
+    pipe.include_large = True
+    real = pipe.extractor.extract
+    pipe.extractor.extract = lambda page, hint: real(page, hint).model_copy(update={"stage": "growth/large"})
+    r = pipe.process("https://useshiplog.com", "hn")
+    assert r.outcome == "drafted"
 
 
 def test_non_software_companies_are_skipped_before_any_lookup(tmp_path: Path):

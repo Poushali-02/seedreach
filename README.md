@@ -220,6 +220,10 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
   a reactor maker) **and** fits none of the software domains; the reason says what it does. A company that
   sells software to any industry counts as software, and so does an AI device filed under AI Agents or one
   the model isn't sure about. `SKIP_NON_SOFTWARE=0` keeps them all.
+- **Growth and large companies**: seedreach is aimed at early-stage startups, so companies the model reads
+  as clearly past early stage (public companies, Series C or later, or hundreds of employees, such as Discord
+  or Datadog) are skipped before any email lookup. When clues are thin or the model is unsure, the company is kept.
+  Pass `--include-large` to `run` or `target` to process them anyway.
 - **Job-alert emails** (`JOB_ALERTS=1`, off by default): portals such as Naukri forbid scraping, but they
   email you the roles matching the alerts you set up there. With this on, each `run` reads those emails
   from the last 3 days (`JOB_ALERT_DAYS`) and lists every new internship in the digest under *From your
@@ -277,9 +281,9 @@ Known gaps, each the subject of a follow-up:
 
 - **Board members**: one site lists a real co-founder only under "Board of Directors", and the model
   sometimes names him anyway.
-- **Company fit**: companies that clearly don't build software are skipped since v0.5.0 (#46), but
-  without an Apollo key, larger companies from Hacker News threads can still get drafts. A fix is planned
-  in [#2](https://github.com/Poushali-02/seedreach/issues/2).
+- **Company fit**: companies that clearly don't build software (#46) and companies clearly past early stage
+  (#2) are skipped before lookups, though early-stage startups with sparse websites are kept by default to
+  avoid false skips.
 - **Domains**: reading more pages made the domain slightly less accurate and less stable; consumer and
   health companies are sometimes filed as B2B SaaS or AI Agents.
 

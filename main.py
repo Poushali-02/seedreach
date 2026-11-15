@@ -46,9 +46,9 @@ def _db() -> Database:
     return Database(get_settings().db_path)
 
 
-def _pipeline(db: Database, dry_run: bool) -> Pipeline:
+def _pipeline(db: Database, dry_run: bool, *, include_large: bool = False) -> Pipeline:
     try:
-        return Pipeline(get_settings(), db, dry_run=dry_run)
+        return Pipeline(get_settings(), db, dry_run=dry_run, include_large=include_large)
     except (ExtractionError, Exception) as exc:  # missing key, OAuth failure, ...
         console.print(f"[red]Setup failed:[/red] {exc}")
         raise typer.Exit(1)
@@ -103,11 +103,13 @@ def run(
     limit: int = typer.Option(5, "--limit", "-n", min=1, help="Stop after this many drafts."),
     source: str = typer.Option("all", "--source", "-s", help="all | yc | launchhn | hn | producthunt"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print drafts; skip Gmail and don't touch the database."),
+    include_large: bool = typer.Option(False, "--include-large", help="Process growth/large companies instead of "
+                                       "skipping them. (Does not unskip previously skipped companies; use --force on target for that.)"),
     digest: Optional[Path] = typer.Option(None, "--digest", help="Also write a short Markdown summary here: roles "
                                           "to apply for, founders to reach, drafts to review (no email addresses)."),
 ) -> None:
     """Fetch new leads, enrich them, and save drafts to Gmail."""
-    pipe = _pipeline(_db(), dry_run)
+    pipe = _pipeline(_db(), dry_run, include_large=include_large) if include_large else _pipeline(_db(), dry_run)
     try:
         results = pipe.run(limit, source, on_result=_report)
     except ValueError as exc:
@@ -133,9 +135,11 @@ def target(
     url: str = typer.Argument(..., help="Startup website, e.g. https://useshiplog.com"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the draft; skip Gmail and the database."),
     force: bool = typer.Option(False, "--force", help="Retry a company previously skipped."),
+    include_large: bool = typer.Option(False, "--include-large", help="Process growth/large companies instead of "
+                                       "skipping them. (Does not unskip previously skipped companies; use --force for that.)"),
 ) -> None:
     """Run the full pipeline for one specific startup."""
-    pipe = _pipeline(_db(), dry_run)
+    pipe = _pipeline(_db(), dry_run, include_large=include_large) if include_large else _pipeline(_db(), dry_run)
     result = pipe.process(url, "manual", force=force)
     _report(result)
     if result.outcome == "error":

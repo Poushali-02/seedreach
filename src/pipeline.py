@@ -115,10 +115,11 @@ def ranked_interleave(streams: list[Iterator[Lead]], rank: Callable[[Lead], int]
 
 
 class Pipeline:
-    def __init__(self, settings: Settings, db: Database, *, dry_run: bool = False) -> None:
+    def __init__(self, settings: Settings, db: Database, *, dry_run: bool = False, include_large: bool = False) -> None:
         self.settings = settings
         self.db = db
         self.dry_run = dry_run
+        self.include_large = include_large
         self.run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         self.traces: list[Trace] = []  # one per company processed, kept in memory for the run summary
         self.profile = load_profile()
@@ -215,6 +216,9 @@ class Pipeline:
             return self._skip(domain, url, source,
                               f"not a software company: {what} ({company.one_line_summary})"
                               "; set SKIP_NON_SOFTWARE=0 to keep these",
+                              company_name=company.company_name)
+        if not getattr(self, "include_large", False) and company.stage == "growth/large":
+            return self._skip(domain, url, source, f"{company.company_name} is growth/large stage",
                               company_name=company.company_name)
         trace.founder_in_text = name_in_text(company.founder_first_name, company.founder_last_name, page.text)
         if trace.founder_in_text is False:  # named from memory, not the page: greet the team instead
