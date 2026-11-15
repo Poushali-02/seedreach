@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 _TRANSIENT_CODES = {429, 500, 503, 504}
 _RETRY_DELAYS = (3, 8, 20)  # seconds between attempts on rate-limit / overload errors
 
-Domain = Literal["DevTools", "AI Agents", "Fintech", "B2B SaaS", "Sports", "Other"]
+Domain = Literal["DevTools", "AI Agents", "Fintech", "B2B SaaS", "Other"]
 PageType = Literal["company", "news", "job_board", "other"]
 BusinessType = Literal["software", "hardware", "services", "other"]
 TOOL_NAME = "record_company"
@@ -36,10 +36,7 @@ Rules:
   for a job posting hosted by a recruiting platform; "other" for anything else (a personal portfolio,
   a directory or aggregator listing many companies). The other fields describe the company the page is
   about either way.
-- core_domain: pick the single best fit. DevTools includes developer security tooling. Sports is for
-  companies whose product is about sport itself: scoring, match or player analytics, coaching and
-  training, athlete wearables, club, league or fan software. A company that only has sports customers
-  among others, or sells sports goods or betting, is not Sports.
+- core_domain: pick the single best fit. DevTools includes developer security tooling.
 - founder_first_name / founder_last_name: ONLY if the text names the person as a founder or
   co-founder. A CEO, CTO or board member who is not called a founder does not count. Never guess,
   infer a name from the company name or an email address, or use names you know from elsewhere.
@@ -88,8 +85,7 @@ def clearly_not_software(company: CompanyProfile) -> bool:
     """True only when two answers agree: the company doesn't sell software, and it fits no software domain.
 
     business_type alone isn't enough: an AI device or a robot is sometimes called "hardware" even when its
-    core_domain is "AI Agents", and so is a sports sensor that ships with its own app ("Sports"). A skip
-    is permanent, so both signals must point the same way.
+    core_domain is "AI Agents". A skip is permanent, so both signals must point the same way.
     """
     return company.business_type != "software" and company.core_domain == "Other"
 

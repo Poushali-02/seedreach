@@ -6,11 +6,11 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 ## [Unreleased]
 
 ### Added
-- A `Sports` company domain, next to DevTools, AI Agents, Fintech and B2B SaaS, for companies whose
-  product is about sport itself (scoring, match and player analytics, coaching, athlete wearables, club
-  and fan software). Add a `"Sports"` entry under `projects` in `profile.json` to choose what those
-  emails lead with; without one they use `Other`, as before. A sports sensor that ships with its own app
-  is kept, not skipped as hardware.
+- `keywords` in `profile.json`: your own topics, picked by words and not by the model. With
+  `"keywords": {"Sports": ["sport", "cricket"]}` and a `"Sports"` entry under `projects`, a company whose
+  description has one of those words gets that paragraph (say, your internship at a sports startup)
+  instead of its domain's, and is never skipped as "not software". The model's instructions are
+  unchanged, so the eval scores are too.
 
 ## [0.6.0] - 2026-11-14
 

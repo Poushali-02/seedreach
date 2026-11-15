@@ -17,7 +17,7 @@ from src.enrichment.company_facts import CompanyFactsClient
 from src.enrichment.job_boards import JobBoardChecker
 from src.intelligence.extractor import ExtractionError, Extractor, clearly_not_software
 from src.intelligence.scraper import ScrapeError, Scraper
-from src.outreach.generator import EmailDraft, generate_email
+from src.outreach.generator import EmailDraft, company_text, generate_email
 from src.outreach.gmail_client import GmailDraftClient, GmailError
 from src.profile import load_profile
 from src.sourcing.base import BaseSourcingProvider, Lead, parse_preferences, region_rank
@@ -207,7 +207,9 @@ class Pipeline:
         if company.page_type != "company":  # an article or posting about them, not their site
             return self._skip(domain, url, source, _not_company_site(company.page_type, company.company_name),
                               company_name=company.company_name)
-        if self.settings.skip_non_software and clearly_not_software(company):
+        # a topic you named in profile.json ("keywords") is one you want, hardware or not
+        wanted = self.profile.topic_for(company_text(company))
+        if self.settings.skip_non_software and clearly_not_software(company) and not wanted:
             # before the job board and email lookups, so nothing more is spent on it
             what = _BUSINESS.get(company.business_type, company.business_type)
             return self._skip(domain, url, source,
