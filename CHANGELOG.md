@@ -5,6 +5,9 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+### Added
+- Import target companies from a CSV file (`main.py add-target --csv companies.csv`): reads a `url` or `website` column, dedupes against already tracked companies, skips invalid rows with a message, and prints a summary (#4).
+
 ## [0.6.0] - 2026-11-14
 
 Job portals that can't be scraped still email you: seedreach now reads those alerts.

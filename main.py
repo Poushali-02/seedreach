@@ -3,6 +3,7 @@
     python main.py run --limit 5
     python main.py target https://useshiplog.com
     python main.py add-target https://useshiplog.com
+    python main.py add-target --csv companies.csv
     python main.py status
 
 Drafts are only ever saved to Gmail Drafts; nothing is sent automatically.
@@ -10,6 +11,7 @@ Drafts are only ever saved to Gmail Drafts; nothing is sent automatically.
 
 from __future__ import annotations
 
+import csv as csv_mod
 import logging
 from pathlib import Path
 from typing import Optional
@@ -143,20 +145,72 @@ def target(
 
 
 @app.command("add-target")
-def add_target(urls: list[str] = typer.Argument(..., help="One or more startup URLs or domains.")) -> None:
+def add_target(
+    urls: Optional[list[str]] = typer.Argument(None, help="One or more startup URLs or domains."),
+    csv: Optional[Path] = typer.Option(None, "--csv", "-c", help="Import URLs from a CSV file with a url or website column."),
+) -> None:
     """Queue URLs/domains; the next `run` processes them before any sourced leads."""
+    if not urls and not csv:
+        console.print("[red]Provide at least one URL or specify a CSV file with --csv.[/red]")
+        raise typer.Exit(2)
+
     db = _db()
-    for raw in urls:
+    queued = 0
+    already_tracked = 0
+    invalid = 0
+
+    def _enqueue(raw: str, prefix: str = "") -> None:
+        nonlocal queued, already_tracked, invalid
+        raw = raw.strip()
+        if not raw:
+            if prefix:
+                console.print(f"[yellow]{prefix}empty URL, skipping[/yellow]")
+            else:
+                console.print("[red]Empty URL provided[/red]")
+            invalid += 1
+            return
         try:
             url = normalize_url(raw)
         except ValueError as exc:
-            console.print(f"[red]{exc}[/red]")
-            continue
+            console.print(f"[red]{prefix}{exc}[/red]")
+            invalid += 1
+            return
         domain = domain_of(url)
         if db.queue(domain, url, "manual"):
+            queued += 1
             console.print(f"[green]queued[/green]  {domain}")
         else:
+            already_tracked += 1
             console.print(f"[yellow]already tracked[/yellow]  {domain} ({db.status_of(domain)})")
+
+    if csv is not None:
+        if not csv.is_file():
+            console.print(f"[red]File not found: {csv}[/red]")
+            raise typer.Exit(1)
+        with csv.open("r", encoding="utf-8-sig", errors="replace") as f:
+            reader = csv_mod.DictReader(f)
+            if not reader.fieldnames:
+                console.print(f"[red]Empty CSV file: {csv}[/red]")
+                raise typer.Exit(1)
+            url_col = None
+            for candidate in ("url", "website"):
+                for col in reader.fieldnames:
+                    if col and col.strip().lower() == candidate:
+                        url_col = col
+                        break
+                if url_col:
+                    break
+            if not url_col:
+                console.print(f"[red]No 'url' or 'website' column found in {csv}[/red]")
+                raise typer.Exit(1)
+            for row in reader:
+                _enqueue(row.get(url_col) or "", prefix=f"Row {reader.line_num}: ")
+
+    if urls:
+        for raw in urls:
+            _enqueue(raw)
+
+    console.print(f"\nDone: {queued} queued, {already_tracked} already tracked, {invalid} invalid.")
 
 
 @app.command()
