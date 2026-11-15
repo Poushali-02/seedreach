@@ -271,6 +271,33 @@ def test_extractor_gemini_retries_bad_json_then_validates():
     assert c.founder_first_name is None and "*" not in c.personalized_hook
 
 
+def test_extractor_gemini_retries_a_timeout_and_reports_a_lasting_one(monkeypatch: pytest.MonkeyPatch):
+    import json
+    import httpx
+    from types import SimpleNamespace as NS
+    import src.intelligence.extractor as extractor
+    from src.intelligence.extractor import ExtractionError, Extractor
+
+    monkeypatch.setattr(extractor.time, "sleep", lambda s: None)
+    replies = iter([httpx.ReadTimeout("slow"), NS(text=json.dumps(GOOD))])
+
+    def generate_content(**kw):
+        reply = next(replies)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    ex = Extractor(Settings(llm_provider="gemini"), client=NS(models=NS(generate_content=generate_content)))
+    assert ex.extract(_page()).company_name  # retried, not crashed
+
+    def always_slow(**kw):
+        raise httpx.ConnectTimeout("down")
+
+    ex = Extractor(Settings(llm_provider="gemini"), client=NS(models=NS(generate_content=always_slow)))
+    with pytest.raises(ExtractionError):  # the pipeline records this as an error and moves on
+        ex.extract(_page())
+
+
 def test_extractor_anthropic_tool_call():
     from types import SimpleNamespace as NS
     from src.intelligence.extractor import Extractor

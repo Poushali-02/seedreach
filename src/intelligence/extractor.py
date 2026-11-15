@@ -11,6 +11,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Literal, Optional
 
+import httpx
 from pydantic import BaseModel, ValidationError, field_validator
 
 from src.config import Settings
@@ -150,11 +151,12 @@ class Extractor:
             try:
                 resp = self.client.models.generate_content(model=self.model, contents=user, config=config)
                 break
-            except errors.APIError as exc:
-                transient = getattr(exc, "code", None) in _TRANSIENT_CODES
+            except (errors.APIError, httpx.TransportError) as exc:  # TransportError: timeouts, dropped connections
+                code = getattr(exc, "code", None)
+                transient = isinstance(exc, httpx.TransportError) or code in _TRANSIENT_CODES
                 if not transient or delay is None:
-                    raise ExtractionError(f"Gemini API error: {exc}") from exc
-                log.warning("Gemini busy (%s); retrying in %ss", exc.code, delay)
+                    raise ExtractionError(f"Gemini API error: {exc!r}") from exc
+                log.warning("Gemini busy (%s); retrying in %ss", code or type(exc).__name__, delay)
                 time.sleep(delay)
         meta = getattr(resp, "usage_metadata", None)  # "thinking" tokens are billed as output
         self.usage.add(*(getattr(meta, f, 0) for f in (
