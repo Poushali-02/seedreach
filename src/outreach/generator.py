@@ -59,8 +59,13 @@ def _role_line(role: Optional[str]) -> str:
     return f"I saw your {title} opening." if title else ""
 
 
+def company_text(company: CompanyProfile) -> str:
+    """What we know the company does, in words: the text a profile's `keywords` are looked for in."""
+    return f"{company.company_name}. {company.one_line_summary} {company.personalized_hook}"
+
+
 def _short(company: CompanyProfile, profile: Profile, name: str, greeting: str, role: str) -> list[str]:
-    proof = _first_sentence(profile.projects_for(company.core_domain)[0])
+    proof = _first_sentence(profile.projects_for(company.core_domain, company_text(company))[0])
     ask = (profile.ask or DEFAULT_ASK).replace("{company}", name)
     return [
         greeting,
@@ -79,7 +84,7 @@ def _long(company: CompanyProfile, profile: Profile, name: str, greeting: str, r
         greeting,
         company.personalized_hook,
         f"{role} {pitch}" if role else pitch,
-        "\n\n".join(profile.projects_for(company.core_domain)),
+        "\n\n".join(profile.projects_for(company.core_domain, company_text(company))),
         f"{profile.experience} My core stack is {profile.stack}.",
         profile.closing,
         "\n".join(_links(profile, 3)),

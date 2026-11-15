@@ -910,6 +910,31 @@ def test_a_device_in_a_software_domain_is_kept():
     assert not clearly_not_software(_company("Other"))  # software, just not in a listed domain
 
 
+def test_profile_keywords_pick_the_paragraph_whatever_the_model_says(tmp_path: Path):
+    cricket = _company("Other", one_line_summary="Live cricket scoring for local clubs.")
+    assert "ExampleScore" in generate_email(cricket, PROFILE).body  # "cricket" is a Sports keyword
+    assert "ExampleScore" in generate_email(_company("B2B SaaS", one_line_summary="Sports analytics."), PROFILE).body
+    # whole words only: "transport" is not "sport"; and no keyword means the model's domain decides
+    assert "ExampleCRM" in generate_email(_company("Other", one_line_summary="Transport routing."), PROFILE).body
+    assert "ExampleScan" in generate_email(_company("DevTools"), PROFILE).body
+    assert "ExampleCRM" in generate_email(cricket, dataclasses.replace(PROFILE, keywords={})).body
+
+    bad = json.loads((ROOT / "profile.example.json").read_text("utf-8"))
+    bad["keywords"] = {"Chess": ["chess"]}  # no "Chess" entry under projects
+    (tmp_path / "p.json").write_text(json.dumps(bad), encoding="utf-8")
+    with pytest.raises(ProfileError, match="keywords"):
+        load_profile(tmp_path / "p.json")
+
+
+def test_a_keyword_topic_is_kept_even_when_it_is_hardware(tmp_path: Path):
+    pipe = _traced_pipeline(tmp_path, "Shiplog was started by Ada.")
+    real = pipe.extractor.extract
+    pipe.extractor.extract = lambda page, hint: real(page, hint).model_copy(
+        update={"business_type": "hardware", "core_domain": "Other",
+                "one_line_summary": "A cricket bat sensor with a coaching app."})
+    assert pipe.process("https://useshiplog.com", "hn").outcome == "drafted"
+
+
 def test_business_type_defaults_to_software():
     # an answer without the field (an older model reply, or one that leaves it out) is kept, never skipped
     assert _company("DevTools").business_type == "software"

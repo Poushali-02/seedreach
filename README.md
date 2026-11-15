@@ -75,6 +75,7 @@ Edit `profile.json`. It is git-ignored, so your details stay on your machine.
 | `experience` | yes | One or two sentences about your most relevant experience. (long emails) |
 | `stack` | yes | Your core technologies, as a phrase. |
 | `projects` | yes | Paragraphs per company domain: `DevTools`, `Fintech`, `AI Agents`, `B2B SaaS`, and a required `Other` fallback. Short emails use the **first sentence of the first paragraph**, so make that sentence your strongest proof (e.g. `I built Angizo (1st prize, Hexafalls 2026), ...`). |
+| `keywords` | no | Your own topics, e.g. `{"Sports": ["sport", "cricket"]}` with a `"Sports"` entry under `projects`. When one of the words is in what the company does (whole words, plurals too), that entry is used instead of the domain's, and the company is never skipped as "not software". Use it where your experience beats a project, e.g. an internship in that field. |
 | `portfolio`, `github`, `linkedin`, `resume`, `phone` | no | Shown at the bottom. Blank ones are left out. |
 | `subject` | no | Subject line; `{company}` is replaced with the company name. |
 | `closing` | no | The closing line before your links. (long emails) |

@@ -11,6 +11,11 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   early stage (public companies, Series C or later, or hundreds of employees) are recorded as skipped
   before any email lookup. If the model is unsure, the company is kept. `--include-large` on `run` and
   `target` allows processing them when desired.
+- `keywords` in `profile.json`: your own topics, picked by words and not by the model. With
+  `"keywords": {"Sports": ["sport", "cricket"]}` and a `"Sports"` entry under `projects`, a company whose
+  description has one of those words gets that paragraph (say, your internship at a sports startup)
+  instead of its domain's, and is never skipped as "not software". The model's instructions are
+  unchanged, so the eval scores are too.
 
 ### Fixed
 - A Gemini timeout or dropped connection stopped the whole run with a traceback. It is now retried like
