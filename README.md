@@ -74,7 +74,7 @@ Edit `profile.json`. It is git-ignored, so your details stay on your machine.
 | `role_pitch` | yes | Completes "I'd love to join Company as ..." e.g. `a remote Backend intern.` (long emails) |
 | `experience` | yes | One or two sentences about your most relevant experience. (long emails) |
 | `stack` | yes | Your core technologies, as a phrase. |
-| `projects` | yes | Paragraphs per company domain: `DevTools`, `Fintech`, `AI Agents`, `B2B SaaS`, and a required `Other` fallback. Short emails use the **first sentence of the first paragraph**, so make that sentence your strongest proof (e.g. `I built Angizo (1st prize, Hexafalls 2026), ...`). |
+| `projects` | yes | Paragraphs per company domain: `DevTools`, `Fintech`, `AI Agents`, `B2B SaaS`, `Sports`, and a required `Other` fallback. A domain you leave out uses `Other`. A paragraph doesn't have to be a project: for a domain where your work experience is the stronger proof, lead with that. Short emails use the **first sentence of the first paragraph**, so make that sentence your strongest proof (e.g. `I built Angizo (1st prize, Hexafalls 2026), ...`). |
 | `portfolio`, `github`, `linkedin`, `resume`, `phone` | no | Shown at the bottom. Blank ones are left out. |
 | `subject` | no | Subject line; `{company}` is replaced with the company name. |
 | `closing` | no | The closing line before your links. (long emails) |

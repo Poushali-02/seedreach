@@ -64,6 +64,7 @@ LONG = dataclasses.replace(PROFILE, email_style="long")
     ("DevTools", ["ExampleScan"]),
     ("Fintech", ["ExamplePay"]),
     ("AI Agents", ["ExampleAgent"]),
+    ("Sports", ["ExampleScore"]),
     ("Other", ["ExampleCRM"]),
 ])
 def test_generator_matches_domain(domain: str, expected: list[str]):
@@ -851,6 +852,14 @@ def test_a_device_in_a_software_domain_is_kept():
     assert not clearly_not_software(_company("AI Agents", business_type="hardware"))
     assert clearly_not_software(_company("Other", business_type="hardware"))  # e.g. a reactor maker
     assert not clearly_not_software(_company("Other"))  # software, just not in a listed domain
+    # a bat or racket sensor that ships with its own app: "hardware", but filed under Sports
+    assert not clearly_not_software(_company("Sports", business_type="hardware"))
+
+
+def test_a_profile_without_a_sports_entry_uses_the_fallback():
+    no_sports = dataclasses.replace(PROFILE, projects={k: v for k, v in PROFILE.projects.items() if k != "Sports"})
+    body = generate_email(_company("Sports"), no_sports).body
+    assert "ExampleCRM" in body and "ExampleScore" not in body
 
 
 def test_business_type_defaults_to_software():
