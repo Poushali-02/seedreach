@@ -16,6 +16,7 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   description has one of those words gets that paragraph (say, your internship at a sports startup)
   instead of its domain's, and is never skipped as "not software". The model's instructions are
   unchanged, so the eval scores are too.
+- Import target companies from a CSV file (`main.py add-target --csv companies.csv`): reads a `url` or `website` column, dedupes against already tracked companies, skips invalid rows with a message, and prints a summary (#4).
 
 ### Fixed
 - A Gemini timeout or dropped connection stopped the whole run with a traceback. It is now retried like

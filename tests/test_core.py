@@ -629,6 +629,118 @@ def test_cli_starts_and_lists_commands():
         assert command in result.output
 
 
+def test_add_target_csv_import_and_skips_bad_rows(tmp_path: Path, monkeypatch):
+    from typer.testing import CliRunner
+
+    import main
+
+    db = Database(tmp_path / "test.db")
+    monkeypatch.setattr(main, "_db", lambda: db)
+
+    db.mark_drafted(
+        "already.com", "https://already.com", "manual",
+        company_name="Already", founder_name="Alice",
+        founder_email="alice@already.com", email_source="test", draft_id="1",
+    )
+
+    csv_file = tmp_path / "companies.csv"
+    # Encoded with BOM to verify utf-8-sig handling for Excel exports
+    csv_content = (
+        "company,url\n"
+        "Shiplog,https://useshiplog.com\n"
+        "Already Company,https://already.com\n"
+        "Broken Company,not a valid url\n"
+        "Empty URL,\n"
+        "Duplicate Shiplog,https://useshiplog.com\n"
+    )
+    csv_file.write_bytes(csv_content.encode("utf-8-sig"))
+
+    result = CliRunner().invoke(main.app, ["add-target", "--csv", str(csv_file)])
+    assert result.exit_code == 0, result.output
+    assert "queued  useshiplog.com" in result.output
+    assert "already tracked  already.com (drafted)" in result.output
+    assert "already tracked  useshiplog.com (queued)" in result.output
+    assert "Row 4: Not a valid website URL" in result.output
+    assert "Row 5: empty URL, skipping" in result.output
+    assert "Done: 1 queued, 2 already tracked, 2 invalid." in result.output
+
+    assert db.status_of("useshiplog.com") == "queued"
+    assert db.status_of("already.com") == "drafted"
+
+
+def test_add_target_csv_website_column(tmp_path: Path, monkeypatch):
+    from typer.testing import CliRunner
+
+    import main
+
+    db = Database(tmp_path / "test.db")
+    monkeypatch.setattr(main, "_db", lambda: db)
+
+    csv_file = tmp_path / "targets.csv"
+    csv_file.write_text(
+        "Name,Website\n"
+        "Example,https://example.com\n",
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(main.app, ["add-target", "--csv", str(csv_file)])
+    assert result.exit_code == 0, result.output
+    assert "queued  example.com" in result.output
+    assert "Done: 1 queued, 0 already tracked, 0 invalid." in result.output
+    assert db.status_of("example.com") == "queued"
+
+
+def test_add_target_csv_errors_and_missing_args(tmp_path: Path, monkeypatch):
+    from typer.testing import CliRunner
+
+    import main
+
+    db = Database(tmp_path / "test.db")
+    monkeypatch.setattr(main, "_db", lambda: db)
+
+    runner = CliRunner()
+
+    # No arguments
+    res_no_args = runner.invoke(main.app, ["add-target"])
+    assert res_no_args.exit_code == 2
+    assert "Provide at least one URL or specify a CSV file with --csv" in res_no_args.output
+
+    # File not found
+    res_missing = runner.invoke(main.app, ["add-target", "--csv", str(tmp_path / "missing.csv")])
+    assert res_missing.exit_code == 1
+    assert "File not found" in res_missing.output
+
+    # Empty CSV
+    empty_csv = tmp_path / "empty.csv"
+    empty_csv.write_text("", encoding="utf-8")
+    res_empty = runner.invoke(main.app, ["add-target", "--csv", str(empty_csv)])
+    assert res_empty.exit_code == 1
+    assert "Empty CSV file" in res_empty.output
+
+    # No url/website column
+    no_col_csv = tmp_path / "no_col.csv"
+    no_col_csv.write_text("name,notes\nAcme,test\n", encoding="utf-8")
+    res_no_col = runner.invoke(main.app, ["add-target", "--csv", str(no_col_csv)])
+    assert res_no_col.exit_code == 1
+    assert "No 'url' or 'website' column found" in res_no_col.output
+
+
+def test_add_target_cli_urls(tmp_path: Path, monkeypatch):
+    from typer.testing import CliRunner
+
+    import main
+
+    db = Database(tmp_path / "test.db")
+    monkeypatch.setattr(main, "_db", lambda: db)
+
+    result = CliRunner().invoke(main.app, ["add-target", "https://site1.com", "not a url"])
+    assert result.exit_code == 0, result.output
+    assert "queued  site1.com" in result.output
+    assert "Not a valid website URL" in result.output
+    assert "Done: 1 queued, 0 already tracked, 1 invalid." in result.output
+    assert db.status_of("site1.com") == "queued"
+
+
 # ---- evals ---------------------------------------------------------------
 def test_eval_snapshot_saves_pages_once_and_keeps_corrections(tmp_path: Path):
     from evals import snapshot as snap
