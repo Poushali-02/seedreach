@@ -1,0 +1,66 @@
+CHANGELOG.md
+  s_21f759cbef9c39::t_fb0b81038b55aa 8-11
+src/intelligence/extractor.py
+  s_21f759cbef9c39::t_fb0b81038b55aa 14,154-156,158-159
+tests/test_core.py
+  s_21f759cbef9c39::t_fb0b81038b55aa 274-300
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "1923aa170c12cc498214f52cd4a55e01c3630cfd",
+  "branch": "fix/gemini-timeout-retry",
+  "prompts": {
+    "s_21f759cbef9c39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2444be44-c998-49de-b6bd-587e1d94a941",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:a493a9a0fe15ad9719301c2b0a65ff9bd657237e9701a448f264fc68f127d718",
+      "total_additions": 37,
+      "total_deletions": 4,
+      "accepted_lines": 37,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_21f759cbef9c39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2444be44-c998-49de-b6bd-587e1d94a941",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:a493a9a0fe15ad9719301c2b0a65ff9bd657237e9701a448f264fc68f127d718",
+      "stats": {
+        "total_additions": 37,
+        "total_deletions": 4,
+        "accepted_lines": 37,
+        "overriden_lines": 0,
+        "files": {
+          "CHANGELOG.md": {
+            "total_additions": 4,
+            "total_deletions": 0,
+            "accepted_lines": 4,
+            "overriden_lines": 0
+          },
+          "src/intelligence/extractor.py": {
+            "total_additions": 6,
+            "total_deletions": 4,
+            "accepted_lines": 6,
+            "overriden_lines": 0
+          },
+          "tests/test_core.py": {
+            "total_additions": 27,
+            "total_deletions": 0,
+            "accepted_lines": 27,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  },
+  "integrity": {"v":1,"commit":"1923aa170c12cc498214f52cd4a55e01c3630cfd","tree":"50d19ac04f7f84f4036c20e63c62c16c9b8134e5","files":{"CHANGELOG.md":"2e9b81087b319cb1baf000c18edb2b35d3613bdb","src/intelligence/extractor.py":"4e5823f7ea26821c990df2c25d7a91ae6f019392","tests/test_core.py":"df74e280b97868f7d6d0905d289a35971d356ca4"},"digest":"f0d8e272c3e122b5bea50d9764b7894b6128d5c4e8ee1ff95a9482c1415570f7"}
+}
