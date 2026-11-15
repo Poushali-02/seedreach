@@ -5,6 +5,13 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+### Added
+- Skip growth and large stage companies in leads (#2). The extractor now classifies company stage
+  (`pre-seed/seed`, `early`, `growth/large`, `unknown`) while reading the site. Companies clearly past
+  early stage (public companies, Series C or later, or hundreds of employees) are recorded as skipped
+  before any email lookup. If the model is unsure, the company is kept. `--include-large` on `run` and
+  `target` allows processing them when desired.
+
 ## [0.6.0] - 2026-11-14
 
 Job portals that can't be scraped still email you: seedreach now reads those alerts.

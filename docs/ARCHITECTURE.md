@@ -32,8 +32,10 @@ python main.py run --limit 5
       company sells and a one-line technical opener (`src/intelligence/extractor.py`). The output is
       validated with Pydantic and retried once if invalid. A news article or job posting is skipped, and
       so is a company that clearly isn't software (`clearly_not_software`: not software **and** domain
-      "Other", unless `SKIP_NON_SOFTWARE=0`). A founder the page doesn't actually name is dropped; for a
-      YC lead whose site names none, the founders on its YC page are used (`yc_founders`, CEO first).
+      "Other", unless `SKIP_NON_SOFTWARE=0`). Companies the model reads as clearly past early stage
+      (`stage == "growth/large"`) are skipped as well, unless `--include-large` was given. A founder the
+      page doesn't actually name is dropped; for a YC lead whose site names none, the founders on its YC
+      page are used (`yc_founders`, CEO first).
    5. If the site links to a Greenhouse, Lever or Ashby job board, reads it for open internships and
       picks an engineering, AI or data one posted in the last `MAX_ROLE_AGE_DAYS` (60) days
       (`src/enrichment/job_boards.py`). This happens before the email checks, so a company skipped for
