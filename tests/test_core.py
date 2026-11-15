@@ -878,6 +878,22 @@ def test_eval_reports_software_startups_the_model_would_skip():
     assert summary["non_software_caught"] == "1 of 2"
 
 
+def test_eval_reports_startups_the_model_would_skip_as_large():
+    from evals.run_evals import score_row, summarize
+
+    def row(domain, large, stage):
+        label = {"domain": domain, "company_name": "Shiplog", "core_domain": "DevTools",
+                 "founder_first_name": "Ada", "founder_last_name": "", "large": large}
+        return score_row(label, {**_company("DevTools").model_dump(), "stage": stage}, None)
+
+    summary = summarize([row("tiny.dev", "", "growth/large"), row("big.com", "yes", "growth/large"),
+                         row("huge.com", "yes", "unknown"), row("seed.dev", "no", "early")])
+    assert summary["startups_skipped_as_large"] == ["tiny.dev"]
+    assert summary["large_caught"] == "1 of 2"
+    # answers without a stage (main today) score as "nothing skipped"
+    assert summarize([row("x.dev", "", None)])["startups_skipped_as_large"] == []
+
+
 def test_eval_scores_wrong_website_catches():
     from evals.run_evals import score_row, summarize
 

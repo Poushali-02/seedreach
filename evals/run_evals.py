@@ -105,6 +105,9 @@ def score_row(label: dict[str, str], pred: Optional[dict[str, Any]], hook_ok: Op
                               and pred.get("core_domain") == "Other"),
         "pred_domain": pred.get("core_domain"),
         "true_domain": label["core_domain"],
+        # #2: labels.csv may have a "large" column (yes/no); blank counts as a startup
+        "is_large": (label.get("large") or "").strip().lower() == "yes",
+        "pred_large": pred.get("stage") == "growth/large",
     }
     result["sendable"] = bool(
         right_site and not result["flagged_not_company"] and result["name_ok"] and result["domain_ok"] and result["founder"] == "correct"
@@ -142,6 +145,10 @@ def summarize(results: list[dict[str, Any]]) -> dict[str, Any]:
         "software_skipped": [r["domain"] for r in on_site if r["is_software"] and not r["pred_software"]],
         "non_software_caught": f"{sum(not r['pred_software'] for r in on_site if not r['is_software'])}"
                                f" of {sum(not r['is_software'] for r in on_site)}",
+        # #2: startups the model would skip as large (must stay 0), and large companies it catches
+        "startups_skipped_as_large": [r["domain"] for r in on_site if r.get("pred_large") and not r.get("is_large")],
+        "large_caught": f"{sum(r.get('pred_large', False) for r in on_site if r.get('is_large'))}"
+                        f" of {sum(r.get('is_large', False) for r in on_site)}",
         "domain_confusions": dict(Counter(
             f"{r['true_domain']} -> {r['pred_domain']}" for r in on_site if not r["domain_ok"]
         )),
@@ -205,6 +212,9 @@ def print_report(summary: dict[str, Any], title: str) -> None:
         f"(company sites wrongly flagged: {summary['company_site_flagged']})",
         f"  software skipped       {len(summary['software_skipped'])}   {summary['software_skipped'] or ''}",
         f"  non-software caught    {summary['non_software_caught']}",
+        f"  startups skipped large {len(summary['startups_skipped_as_large'])}   "
+        f"{summary['startups_skipped_as_large'] or ''}",
+        f"  large caught           {summary['large_caught']}",
         f"  READY TO SEND          {summary['sendable']}%",
     ]
     if summary["domain_confusions"]:
