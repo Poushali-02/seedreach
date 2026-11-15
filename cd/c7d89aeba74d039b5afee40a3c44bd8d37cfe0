@@ -1,0 +1,90 @@
+README.md
+  s_21f759cbef9c39::t_3f170d5f226c92 223-226,284-286
+docs/ARCHITECTURE.md
+  s_21f759cbef9c39::t_3f170d5f226c92 35-38
+main.py
+  s_21f759cbef9c39::t_3f170d5f226c92 49,51,106-107,112,138-139,142
+src/intelligence/extractor.py
+  s_21f759cbef9c39::t_3f170d5f226c92 27,41-44,66
+src/pipeline.py
+  s_21f759cbef9c39::t_3f170d5f226c92 118,122,220-222
+tests/test_core.py
+  s_21f759cbef9c39::t_3f170d5f226c92 723,830-859
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "cdc7d89aeba74d039b5afee40a3c44bd8d37cfe0",
+  "branch": "feat/sports-domain",
+  "prompts": {
+    "s_21f759cbef9c39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2444be44-c998-49de-b6bd-587e1d94a941",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:671a708ca6a2e71eae3988b4cad0210d08aa8237c6c80a129c6e78e5049f0be6",
+      "total_additions": 61,
+      "total_deletions": 11,
+      "accepted_lines": 61,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_21f759cbef9c39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2444be44-c998-49de-b6bd-587e1d94a941",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:671a708ca6a2e71eae3988b4cad0210d08aa8237c6c80a129c6e78e5049f0be6",
+      "stats": {
+        "total_additions": 61,
+        "total_deletions": 11,
+        "accepted_lines": 61,
+        "overriden_lines": 0,
+        "files": {
+          "README.md": {
+            "total_additions": 7,
+            "total_deletions": 3,
+            "accepted_lines": 7,
+            "overriden_lines": 0
+          },
+          "docs/ARCHITECTURE.md": {
+            "total_additions": 4,
+            "total_deletions": 2,
+            "accepted_lines": 4,
+            "overriden_lines": 0
+          },
+          "main.py": {
+            "total_additions": 8,
+            "total_deletions": 4,
+            "accepted_lines": 8,
+            "overriden_lines": 0
+          },
+          "src/intelligence/extractor.py": {
+            "total_additions": 6,
+            "total_deletions": 0,
+            "accepted_lines": 6,
+            "overriden_lines": 0
+          },
+          "src/pipeline.py": {
+            "total_additions": 5,
+            "total_deletions": 1,
+            "accepted_lines": 5,
+            "overriden_lines": 0
+          },
+          "tests/test_core.py": {
+            "total_additions": 31,
+            "total_deletions": 1,
+            "accepted_lines": 31,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  },
+  "integrity": {"v":1,"commit":"cdc7d89aeba74d039b5afee40a3c44bd8d37cfe0","tree":"23f3e59802357b2ff1c7f346cb1869297abc2680","files":{"README.md":"c6187ad557316129f19653edbc9f92919b98967c","docs/ARCHITECTURE.md":"9bfdb42648cdd4656a19e8f4d4c4f2c90e873379","main.py":"3e8486d7c5df363bad998bece97e1f41995ee0a7","src/intelligence/extractor.py":"03602535d742f2b9b283f7ba99ebc549da2629a6","src/pipeline.py":"5b35930013b96393c0abf51af30699aed4daf909","tests/test_core.py":"bd8b2a6b5904a5e2a929d112e52c5dd1850caf49"},"digest":"88cc4ecb8afd4af7805e527f10bc42f741e1c53b73cc6943150cb345cef3430f"}
+}
