@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     # Don't name an internship first posted more than this many days ago (openings often stay listed long
     # after anyone reads applications). 0 turns the limit off. Roles whose board gives no date are kept.
     max_role_age_days: int = 60
-    # Read your own job-alert emails (Naukri so far) and list each new opening in the run digest with its
+    # Read your own job-alert emails (Naukri and LinkedIn so far) and list each new opening in the run digest with its
     # apply link. Needs Gmail's read-only scope, so the first run after turning this on signs you in again.
     job_alerts: bool = False
     job_alert_days: int = 3  # how far back to look for alert emails

@@ -12,6 +12,7 @@ One small parser per sender. An email from a sender with no parser is never open
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import Callable, Iterable
 from urllib.parse import urlsplit, urlunsplit
@@ -25,7 +26,7 @@ log = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class AlertJob:
-    portal: str  # "Naukri"
+    portal: str  # "Naukri", "LinkedIn"
     company: str
     role: str
     apply_url: str
@@ -66,9 +67,39 @@ def parse_naukri(html: str) -> list[AlertJob]:
     return jobs
 
 
+_LINKEDIN_JOB = re.compile(r"linkedin\.com/(?:comm/)?jobs/view/(\d+)")
+
+
+def parse_linkedin(html: str) -> list[AlertJob]:
+    """LinkedIn's job emails ("New jobs similar to ..."): one card per job.
+
+    A card links to linkedin.com/comm/jobs/view/<id>/ three times: the logo, the whole card, and the
+    title on its own. The title link sits in a small table whose text reads title, then
+    "Company · Location". The email's heading links to a job too, but has no such line and is left out.
+    """
+    jobs: list[AlertJob] = []
+    seen: set[str] = set()
+    for link in BeautifulSoup(html, "html.parser").find_all("a", href=_LINKEDIN_JOB):
+        job_id = _LINKEDIN_JOB.search(link["href"]).group(1)
+        role = link.get_text(" ", strip=True)
+        card = link.find_parent("table")
+        texts = list(card.stripped_strings) if card else []
+        # the title link: its text is the first line of its table, and "Company · Location" follows
+        if job_id in seen or not role or len(texts) != 2 or texts[0] != role or "·" not in texts[1]:
+            continue
+        company, _, place = (part.strip() for part in texts[1].partition("·"))
+        if not company:
+            continue
+        seen.add(job_id)
+        # the plain job page: no /comm/ (LinkedIn's email click tracking) and no tracking query
+        jobs.append(AlertJob("LinkedIn", company, role, f"https://www.linkedin.com/jobs/view/{job_id}/", place))
+    return jobs
+
+
 # sender address -> parser. Add a portal here once you have one of its real alert emails to test with.
 PARSERS: dict[str, Callable[[str], list[AlertJob]]] = {
     "naukrialerts@naukri.com": parse_naukri,
+    "jobs-noreply@linkedin.com": parse_linkedin,
 }
 
 
