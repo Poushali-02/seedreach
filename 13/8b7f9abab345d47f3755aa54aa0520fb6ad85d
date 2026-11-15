@@ -1,0 +1,69 @@
+CHANGELOG.md
+  s_21f759cbef9c39::t_fb0b81038b55aa 15-18
+src/intelligence/extractor.py
+  s_21f759cbef9c39::t_fb0b81038b55aa 14,160-162,164-165
+tests/test_core.py
+  s_21f759cbef9c39::t_fb0b81038b55aa 274-300
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "138b7f9abab345d47f3755aa54aa0520fb6ad85d",
+  "prompts": {},
+  "sessions": {
+    "s_21f759cbef9c39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2444be44-c998-49de-b6bd-587e1d94a941",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:671a708ca6a2e71eae3988b4cad0210d08aa8237c6c80a129c6e78e5049f0be6",
+      "stats": {
+        "total_additions": 61,
+        "total_deletions": 11,
+        "accepted_lines": 61,
+        "overriden_lines": 0,
+        "files": {
+          "README.md": {
+            "total_additions": 7,
+            "total_deletions": 3,
+            "accepted_lines": 7,
+            "overriden_lines": 0
+          },
+          "docs/ARCHITECTURE.md": {
+            "total_additions": 4,
+            "total_deletions": 2,
+            "accepted_lines": 4,
+            "overriden_lines": 0
+          },
+          "main.py": {
+            "total_additions": 8,
+            "total_deletions": 4,
+            "accepted_lines": 8,
+            "overriden_lines": 0
+          },
+          "src/intelligence/extractor.py": {
+            "total_additions": 6,
+            "total_deletions": 0,
+            "accepted_lines": 6,
+            "overriden_lines": 0
+          },
+          "src/pipeline.py": {
+            "total_additions": 5,
+            "total_deletions": 1,
+            "accepted_lines": 5,
+            "overriden_lines": 0
+          },
+          "tests/test_core.py": {
+            "total_additions": 31,
+            "total_deletions": 1,
+            "accepted_lines": 31,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  },
+  "integrity": {"v":1,"commit":"138b7f9abab345d47f3755aa54aa0520fb6ad85d","tree":"eeda9c6b9e0af083036442927caa44ce396351ca","files":{"CHANGELOG.md":"f110af235b44e26731a77d79f3e1634af851e0b4","src/intelligence/extractor.py":"39136e63b644b554020b191b12e914b6f3ba8da7","tests/test_core.py":"038d9fe7ede0f580f4fabba5c3035bbbee5e956b"},"digest":"b4152faffb4ba9283fd5e9289624a76d8401f5c29db70648d479d4ba963e1212"}
+}
