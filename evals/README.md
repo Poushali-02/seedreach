@@ -42,8 +42,25 @@ answer; visit the site and fix what's wrong:
 | `core_domain` | `DevTools`, `AI Agents`, `Fintech`, `B2B SaaS` or `Other`. Two allowed if both fit: `DevTools\|AI Agents` |
 | `founder_first_name`, `founder_last_name` | Only if the site calls the person a founder or co-founder (a CEO who isn't called a founder doesn't count). Leave blank if it doesn't |
 | `other_founders` | Any other founders the site names, separated by `;` (e.g. `Sam Bobb; Max`). Naming any of them also counts as correct |
+| `large` | `yes` if the company is clearly past early stage: public, Series C or later, or about 200+ people (Apollo, LinkedIn or Crunchbase). Blank or `no` for a startup. Scores the large-company skip (#2): **startups skipped as large** must stay 0 |
 | `hook_ok` | `yes` if every claim in `model_hook` is true and on the site, `no` otherwise |
 | `checked` | `yes` once you've checked the row |
 
 `emails_on_site` lists the addresses found on the pages, for reference. Re-running the script keeps
 every row you've edited.
+
+## 4. Score, and compare versions
+
+```bash
+python -m evals.run_evals            # scores the saved answers you checked
+python -m evals.run_evals --live     # re-runs the model on the saved pages, 5 times
+```
+
+**One run is not a measurement.** The model's answers vary from run to run: on 15 Nov 2026 the same code
+scored 70% and then 53% "ready to send" on two single runs. So:
+
+- Compare two versions on the **mean across at least 5 runs each** (the "Across N runs" lines), run on
+  the same day. A difference smaller than the ranges overlap is not a difference.
+- The lists are steadier than the percentages and matter more, because a skip is permanent:
+  **software skipped** and **startups skipped large** must stay empty.
+- Five runs of 30 pages is 150 model calls. Gemini's free tier allows 500 a day, shared with your real runs.

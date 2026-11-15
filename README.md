@@ -267,7 +267,8 @@ Model: `gemini-flash-lite-latest`, 2 runs, 2026-11-14 (v0.5.0).
 
 The opening lines in these runs haven't been checked by hand (the last check found every claim true in
 93% of them), so "ready to send" counts only the rule checks and is a little high. With 30 startups, one
-company is about 3–4 points, so differences of a point or two between versions are noise.
+company is about 3–4 points. Single runs also vary a lot on their own (the same code scored 70% and 53%
+on two runs on 15 Nov), so versions are compared on the mean of at least 5 runs each.
 
 How it got here, on the same 30 startups:
 

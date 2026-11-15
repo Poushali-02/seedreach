@@ -271,6 +271,33 @@ def test_extractor_gemini_retries_bad_json_then_validates():
     assert c.founder_first_name is None and "*" not in c.personalized_hook
 
 
+def test_extractor_gemini_retries_a_timeout_and_reports_a_lasting_one(monkeypatch: pytest.MonkeyPatch):
+    import json
+    import httpx
+    from types import SimpleNamespace as NS
+    import src.intelligence.extractor as extractor
+    from src.intelligence.extractor import ExtractionError, Extractor
+
+    monkeypatch.setattr(extractor.time, "sleep", lambda s: None)
+    replies = iter([httpx.ReadTimeout("slow"), NS(text=json.dumps(GOOD))])
+
+    def generate_content(**kw):
+        reply = next(replies)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    ex = Extractor(Settings(llm_provider="gemini"), client=NS(models=NS(generate_content=generate_content)))
+    assert ex.extract(_page()).company_name  # retried, not crashed
+
+    def always_slow(**kw):
+        raise httpx.ConnectTimeout("down")
+
+    ex = Extractor(Settings(llm_provider="gemini"), client=NS(models=NS(generate_content=always_slow)))
+    with pytest.raises(ExtractionError):  # the pipeline records this as an error and moves on
+        ex.extract(_page())
+
+
 def test_extractor_anthropic_tool_call():
     from types import SimpleNamespace as NS
     from src.intelligence.extractor import Extractor
@@ -931,6 +958,33 @@ def test_eval_reports_software_startups_the_model_would_skip():
                          row("rinse.com", "services", "services"), row("oklo.com", "hardware", "software")])
     assert summary["software_skipped"] == ["b.dev"]
     assert summary["non_software_caught"] == "1 of 2"
+
+
+def test_eval_reports_the_mean_and_range_across_runs():
+    from evals.run_evals import spread
+
+    runs = [{"sendable": 70.0, "founder_correct": 92.6, "founder_outcomes": {"invented": 1}, "core_domain": 88.9},
+            {"sendable": 53.3, "founder_correct": 88.9, "founder_outcomes": {}, "core_domain": 81.5}]
+    text = spread(runs)
+    assert "Across 2 runs" in text
+    assert "mean 61.6%   range 53.3-70%" in text  # ready to send
+    assert "mean 0.5   range 0-1" in text  # invented founders, as a count
+
+
+def test_eval_reports_startups_the_model_would_skip_as_large():
+    from evals.run_evals import score_row, summarize
+
+    def row(domain, large, stage):
+        label = {"domain": domain, "company_name": "Shiplog", "core_domain": "DevTools",
+                 "founder_first_name": "Ada", "founder_last_name": "", "large": large}
+        return score_row(label, {**_company("DevTools").model_dump(), "stage": stage}, None)
+
+    summary = summarize([row("tiny.dev", "", "growth/large"), row("big.com", "yes", "growth/large"),
+                         row("huge.com", "yes", "unknown"), row("seed.dev", "no", "early")])
+    assert summary["startups_skipped_as_large"] == ["tiny.dev"]
+    assert summary["large_caught"] == "1 of 2"
+    # answers without a stage (main today) score as "nothing skipped"
+    assert summarize([row("x.dev", "", None)])["startups_skipped_as_large"] == []
 
 
 def test_eval_scores_wrong_website_catches():

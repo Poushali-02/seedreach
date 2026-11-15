@@ -17,6 +17,10 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   instead of its domain's, and is never skipped as "not software". The model's instructions are
   unchanged, so the eval scores are too.
 
+### Fixed
+- A Gemini timeout or dropped connection stopped the whole run with a traceback. It is now retried like
+  a busy server (3 times), and if it lasts, that company is reported as an error and the run moves on.
+
 ## [0.6.0] - 2026-11-14
 
 Job portals that can't be scraped still email you: seedreach now reads those alerts.
