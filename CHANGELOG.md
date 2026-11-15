@@ -12,6 +12,10 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   before any email lookup. If the model is unsure, the company is kept. `--include-large` on `run` and
   `target` allows processing them when desired.
 
+### Fixed
+- A Gemini timeout or dropped connection stopped the whole run with a traceback. It is now retried like
+  a busy server (3 times), and if it lasts, that company is reported as an error and the run moves on.
+
 ## [0.6.0] - 2026-11-14
 
 Job portals that can't be scraped still email you: seedreach now reads those alerts.
