@@ -1,0 +1,82 @@
+.env.example
+  s_21f759cbef9c39::t_3c3e3892bc2ae4 8
+CHANGELOG.md
+  s_21f759cbef9c39::t_4e72948da6f545 24-28
+README.md
+  s_21f759cbef9c39::t_3c3e3892bc2ae4 103
+examples/github-actions-runner.yml
+  s_21f759cbef9c39::t_3c3e3892bc2ae4 87
+src/config.py
+  s_21f759cbef9c39::t_3c3e3892bc2ae4 27-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "37ff4b6a9f2c49230729bb12ef523644078b2580",
+  "branch": "chore/pin-gemini-model",
+  "prompts": {
+    "s_21f759cbef9c39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2444be44-c998-49de-b6bd-587e1d94a941",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:740d315ac945ab643a29bd7dad33ee8ab028ea40dd9cd59e79d2fde0f4360d7f",
+      "total_additions": 18,
+      "total_deletions": 10,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_21f759cbef9c39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2444be44-c998-49de-b6bd-587e1d94a941",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:740d315ac945ab643a29bd7dad33ee8ab028ea40dd9cd59e79d2fde0f4360d7f",
+      "stats": {
+        "total_additions": 18,
+        "total_deletions": 10,
+        "accepted_lines": 11,
+        "overriden_lines": 0,
+        "files": {
+          ".env.example": {
+            "total_additions": 1,
+            "total_deletions": 1,
+            "accepted_lines": 1,
+            "overriden_lines": 0
+          },
+          "CHANGELOG.md": {
+            "total_additions": 12,
+            "total_deletions": 6,
+            "accepted_lines": 5,
+            "overriden_lines": 0
+          },
+          "README.md": {
+            "total_additions": 1,
+            "total_deletions": 1,
+            "accepted_lines": 1,
+            "overriden_lines": 0
+          },
+          "examples/github-actions-runner.yml": {
+            "total_additions": 1,
+            "total_deletions": 1,
+            "accepted_lines": 1,
+            "overriden_lines": 0
+          },
+          "src/config.py": {
+            "total_additions": 3,
+            "total_deletions": 1,
+            "accepted_lines": 3,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  },
+  "integrity": {"v":1,"commit":"37ff4b6a9f2c49230729bb12ef523644078b2580","tree":"0849834fb3e90a915581e392a87472857e0326ef","files":{".env.example":"22a1a2de6f6947ce1197d0babd66c8144e4324d7","CHANGELOG.md":"399dc73c63d2f14519709b9403d55a707a6d3483","README.md":"699ca2928de5325c22db5677fdb17960882ac890","examples/github-actions-runner.yml":"b0e40af8bfb5422ed9deaeb39e9aee3a8c00f6c2","src/config.py":"eb4f7cb3f0ff1ecd23700e682356ab6f943fb506"},"digest":"f7bf926a2ebffa74925fc2d0685bfc29d8e1976a7679956cb50ac9d809e13d98"}
+}
