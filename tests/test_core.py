@@ -878,6 +878,17 @@ def test_eval_reports_software_startups_the_model_would_skip():
     assert summary["non_software_caught"] == "1 of 2"
 
 
+def test_eval_reports_the_mean_and_range_across_runs():
+    from evals.run_evals import spread
+
+    runs = [{"sendable": 70.0, "founder_correct": 92.6, "founder_outcomes": {"invented": 1}, "core_domain": 88.9},
+            {"sendable": 53.3, "founder_correct": 88.9, "founder_outcomes": {}, "core_domain": 81.5}]
+    text = spread(runs)
+    assert "Across 2 runs" in text
+    assert "mean 61.6%   range 53.3-70%" in text  # ready to send
+    assert "mean 0.5   range 0-1" in text  # invented founders, as a count
+
+
 def test_eval_reports_startups_the_model_would_skip_as_large():
     from evals.run_evals import score_row, summarize
 

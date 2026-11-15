@@ -48,3 +48,19 @@ answer; visit the site and fix what's wrong:
 
 `emails_on_site` lists the addresses found on the pages, for reference. Re-running the script keeps
 every row you've edited.
+
+## 4. Score, and compare versions
+
+```bash
+python -m evals.run_evals            # scores the saved answers you checked
+python -m evals.run_evals --live     # re-runs the model on the saved pages, 5 times
+```
+
+**One run is not a measurement.** The model's answers vary from run to run: on 15 Nov 2026 the same code
+scored 70% and then 53% "ready to send" on two single runs. So:
+
+- Compare two versions on the **mean across at least 5 runs each** (the "Across N runs" lines), run on
+  the same day. A difference smaller than the ranges overlap is not a difference.
+- The lists are steadier than the percentages and matter more, because a skip is permanent:
+  **software skipped** and **startups skipped large** must stay empty.
+- Five runs of 30 pages is 150 model calls. Gemini's free tier allows 500 a day, shared with your real runs.

@@ -222,12 +222,25 @@ def print_report(summary: dict[str, Any], title: str) -> None:
     print("\n".join(line for line in lines if line))
 
 
+def spread(runs: list[dict[str, Any]]) -> str:
+    """Mean and range across repeats. One run is not a measurement: the same code can differ by 15+ points."""
+    def line(label: str, values: list[float], unit: str = "%") -> str:
+        return f"  {label:22} mean {sum(values) / len(values):.1f}{unit}   range {min(values):g}-{max(values):g}{unit}"
+    return "\n".join([
+        f"\nAcross {len(runs)} runs (compare versions on these, never on a single run)",
+        line("READY TO SEND", [r["sendable"] for r in runs]),
+        line("founder correct", [r["founder_correct"] for r in runs]),
+        line("invented founders", [r["founder_outcomes"].get("invented", 0) for r in runs], unit=""),
+        line("core domain", [r["core_domain"] for r in runs]),
+    ])
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--labels", type=Path, default=DATA / "labels.csv")
     parser.add_argument("--pages", type=Path, default=DATA / "pages", help="saved pages to score against")
     parser.add_argument("--live", action="store_true", help="re-run the extractor instead of using saved answers")
-    parser.add_argument("-n", "--repeats", type=int, default=3, help="runs per page with --live")
+    parser.add_argument("-n", "--repeats", type=int, default=5, help="runs per page with --live")
     args = parser.parse_args()
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
 
@@ -242,6 +255,7 @@ def main() -> None:
         out["stability"] = stability(runs)
         for i, summary in enumerate(out["runs"], 1):
             print_report(summary, f"Live run {i}/{args.repeats} ({out['model']})")
+        print(spread(out["runs"]))
         print(f"\nSame domain and founder verdict in every run: {out['stability']['stable']}%"
               f"  unstable: {', '.join(out['stability']['unstable_rows']) or 'none'}")
     else:
