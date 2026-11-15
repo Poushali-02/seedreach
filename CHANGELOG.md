@@ -6,6 +6,9 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 ## [Unreleased]
 
 ### Added
+- LinkedIn's job emails are read too (#36): with `JOB_ALERTS=1`, new internships from emails such as
+  "New jobs similar to ..." (`jobs-noreply@linkedin.com`) are listed in the digest with the company,
+  role, place and a plain link to the job page, without LinkedIn's tracking parts.
 - Skip growth and large stage companies in leads (#2). The extractor now classifies company stage
   (`pre-seed/seed`, `early`, `growth/large`, `unknown`) while reading the site. Companies clearly past
   early stage (public companies, Series C or later, or hundreds of employees) are recorded as skipped

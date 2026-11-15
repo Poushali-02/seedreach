@@ -235,8 +235,9 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
     Console, first add `https://www.googleapis.com/auth/gmail.readonly` next to the compose scope (step 5
     of *Set up Gmail access* above). You don't need to delete `token.json`: seedreach notices it can't
     read mail and signs you in again.
-  - Naukri (`naukrialerts@naukri.com`) is read today. Other portals need one small parser each, written
-    from a real alert email (`src/sourcing/job_alerts.py`).
+  - Read today: Naukri job alerts (`naukrialerts@naukri.com`) and LinkedIn's job emails
+    (`jobs-noreply@linkedin.com`, e.g. "New jobs similar to ..."). Other portals and senders need one
+    small parser each, written from a real email (`src/sourcing/job_alerts.py`).
   - These openings are for you to apply to. They don't become drafts, because an alert names a company
     but not its website. To also write to one, add its site: `python main.py add-target <url>`.
   - Only titles that say intern, internship, new grad or co-op are kept. `JOB_ALERT_INTERNSHIPS_ONLY=0`

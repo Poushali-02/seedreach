@@ -37,6 +37,28 @@ def test_naukri_alert_gives_company_role_place_and_a_clean_link():
     assert all("?" not in j.apply_url and "uid" not in j.apply_url for j in jobs)
 
 
+def test_linkedin_job_email_gives_company_role_place_and_the_plain_job_link():
+    from src.sourcing.job_alerts import PARSERS, parse_linkedin
+
+    linkedin = (Path(__file__).parent / "fixtures" / "job_alerts" / "linkedin_similar_jobs.html").read_text("utf-8")
+    jobs = parse_linkedin(linkedin)
+    # one per card: not the logo link, not the link around the whole card, not the email's heading
+    assert jobs == [
+        AlertJob("LinkedIn", "ExamplePay Technologies", "Backend Engineering Intern",
+                 "https://www.linkedin.com/jobs/view/1000000001/", "Bengaluru (Hybrid)"),
+        AlertJob("LinkedIn", "Samplestack Labs", "Forward Deployed Engineer",
+                 "https://www.linkedin.com/jobs/view/1000000002/", "Hyderabad"),
+    ]
+    # LinkedIn's email links go through /comm/ with tracking ids: neither may survive
+    assert all("comm" not in j.apply_url and "?" not in j.apply_url for j in jobs)
+
+    assert PARSERS["jobs-noreply@linkedin.com"] is parse_linkedin
+    kept = jobs_in([AlertMessage("jobs-noreply@linkedin.com", linkedin)])
+    assert [j.role for j in kept] == ["Backend Engineering Intern"]
+    assert "jobs-noreply@linkedin.com" in gmail_query(3)
+    assert parse_linkedin("<p>a new layout</p>") == []
+
+
 def test_only_internships_by_default_and_each_link_once():
     naukri = AlertMessage("naukrialerts@naukri.com", NAUKRI)
     assert [j.role for j in jobs_in([naukri, naukri])] == ["Backend Engineering Intern"]
