@@ -1,0 +1,66 @@
+evals/README.md
+  s_21f759cbef9c39::t_1b4be2768b832f 45
+evals/run_evals.py
+  s_21f759cbef9c39::t_1b4be2768b832f 108-110,148-151,215-217
+tests/test_core.py
+  s_21f759cbef9c39::t_85c794c22d4012 881-896
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "1622035d7c2e7b2edad3c25976bc9e72c1f249d8",
+  "branch": "evals/large-company-rule",
+  "prompts": {
+    "s_21f759cbef9c39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2444be44-c998-49de-b6bd-587e1d94a941",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:5cd4229a7472b893b0fd9d05f25a422cec5e586dc56f6c33045d38c00bdaed98",
+      "total_additions": 27,
+      "total_deletions": 0,
+      "accepted_lines": 27,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_21f759cbef9c39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2444be44-c998-49de-b6bd-587e1d94a941",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:5cd4229a7472b893b0fd9d05f25a422cec5e586dc56f6c33045d38c00bdaed98",
+      "stats": {
+        "total_additions": 27,
+        "total_deletions": 0,
+        "accepted_lines": 27,
+        "overriden_lines": 0,
+        "files": {
+          "evals/README.md": {
+            "total_additions": 1,
+            "total_deletions": 0,
+            "accepted_lines": 1,
+            "overriden_lines": 0
+          },
+          "evals/run_evals.py": {
+            "total_additions": 10,
+            "total_deletions": 0,
+            "accepted_lines": 10,
+            "overriden_lines": 0
+          },
+          "tests/test_core.py": {
+            "total_additions": 16,
+            "total_deletions": 0,
+            "accepted_lines": 16,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  },
+  "integrity": {"v":1,"commit":"1622035d7c2e7b2edad3c25976bc9e72c1f249d8","tree":"dfeb851c31e875da5edf84120994f426a53aa907","files":{"evals/README.md":"2d2d2d5fde827c6bcb9f1c723425b5b89a112b43","evals/run_evals.py":"ad2b4cec2623f0311be62c6184379845a9507b23","tests/test_core.py":"ba38e778cbc576484ba62f23e153dadd0f540d0e"},"digest":"cdf814004c9e429875cbdcd0de0dcfdbb5e0e13ab30cced0b27bf29d414e75cc"}
+}
