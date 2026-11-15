@@ -11,6 +11,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Literal, Optional
 
+import httpx
 from pydantic import BaseModel, ValidationError, field_validator
 
 from src.config import Settings
@@ -24,6 +25,7 @@ _RETRY_DELAYS = (3, 8, 20)  # seconds between attempts on rate-limit / overload 
 
 Domain = Literal["DevTools", "AI Agents", "Fintech", "B2B SaaS", "Other"]
 PageType = Literal["company", "news", "job_board", "other"]
+Stage = Literal["pre-seed/seed", "early", "growth/large", "unknown"]
 BusinessType = Literal["software", "hardware", "services", "other"]
 TOOL_NAME = "record_company"
 
@@ -37,6 +39,10 @@ Rules:
   a directory or aggregator listing many companies). The other fields describe the company the page is
   about either way.
 - core_domain: pick the single best fit. DevTools includes developer security tooling.
+- stage: "pre-seed/seed" for a founding team or pre-launch/waitlist project; "early" for Series A/B
+  startups with growing engineering teams; "growth/large" only when the page makes it clear that
+  the company is past early stage (public company, Series C or later, or hundreds of employees,
+  e.g. Discord, Fastly, Stripe, Datadog); "unknown" if clues are insufficient or you are unsure.
 - founder_first_name / founder_last_name: ONLY if the text names the person as a founder or
   co-founder. A CEO, CTO or board member who is not called a founder does not count. Never guess,
   infer a name from the company name or an email address, or use names you know from elsewhere.
@@ -58,6 +64,7 @@ class CompanyProfile(BaseModel):
     company_name: str
     one_line_summary: str
     core_domain: Domain
+    stage: Stage = "unknown"
     founder_first_name: Optional[str] = None
     founder_last_name: Optional[str] = None
     personalized_hook: str
@@ -150,11 +157,12 @@ class Extractor:
             try:
                 resp = self.client.models.generate_content(model=self.model, contents=user, config=config)
                 break
-            except errors.APIError as exc:
-                transient = getattr(exc, "code", None) in _TRANSIENT_CODES
+            except (errors.APIError, httpx.TransportError) as exc:  # TransportError: timeouts, dropped connections
+                code = getattr(exc, "code", None)
+                transient = isinstance(exc, httpx.TransportError) or code in _TRANSIENT_CODES
                 if not transient or delay is None:
-                    raise ExtractionError(f"Gemini API error: {exc}") from exc
-                log.warning("Gemini busy (%s); retrying in %ss", exc.code, delay)
+                    raise ExtractionError(f"Gemini API error: {exc!r}") from exc
+                log.warning("Gemini busy (%s); retrying in %ss", code or type(exc).__name__, delay)
                 time.sleep(delay)
         meta = getattr(resp, "usage_metadata", None)  # "thinking" tokens are billed as output
         self.usage.add(*(getattr(meta, f, 0) for f in (

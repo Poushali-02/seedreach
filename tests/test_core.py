@@ -271,6 +271,33 @@ def test_extractor_gemini_retries_bad_json_then_validates():
     assert c.founder_first_name is None and "*" not in c.personalized_hook
 
 
+def test_extractor_gemini_retries_a_timeout_and_reports_a_lasting_one(monkeypatch: pytest.MonkeyPatch):
+    import json
+    import httpx
+    from types import SimpleNamespace as NS
+    import src.intelligence.extractor as extractor
+    from src.intelligence.extractor import ExtractionError, Extractor
+
+    monkeypatch.setattr(extractor.time, "sleep", lambda s: None)
+    replies = iter([httpx.ReadTimeout("slow"), NS(text=json.dumps(GOOD))])
+
+    def generate_content(**kw):
+        reply = next(replies)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    ex = Extractor(Settings(llm_provider="gemini"), client=NS(models=NS(generate_content=generate_content)))
+    assert ex.extract(_page()).company_name  # retried, not crashed
+
+    def always_slow(**kw):
+        raise httpx.ConnectTimeout("down")
+
+    ex = Extractor(Settings(llm_provider="gemini"), client=NS(models=NS(generate_content=always_slow)))
+    with pytest.raises(ExtractionError):  # the pipeline records this as an error and moves on
+        ex.extract(_page())
+
+
 def test_extractor_anthropic_tool_call():
     from types import SimpleNamespace as NS
     from src.intelligence.extractor import Extractor
@@ -832,7 +859,7 @@ def _traced_pipeline(tmp_path: Path, founder_text: str):
             return _company("DevTools")
 
     pipe = pipeline.Pipeline.__new__(pipeline.Pipeline)
-    pipe.settings, pipe.db, pipe.dry_run = Settings(), Database(tmp_path / "t.db"), False
+    pipe.settings, pipe.db, pipe.dry_run, pipe.include_large = Settings(), Database(tmp_path / "t.db"), False, False
     pipe.founder_pages, pipe.yc_client = {}, None
     pipe.run_id, pipe.traces, pipe.profile = "run-1", [], PROFILE
     pipe.scraper = NS(fetch=lambda url: ScrapedPage(
@@ -939,6 +966,36 @@ def test_model_flagged_article_is_skipped(tmp_path: Path):
     assert r.outcome == "skipped" and "a news article about Shiplog" in r.detail
 
 
+def test_model_flagged_growth_large_company_is_skipped(tmp_path: Path):
+    pipe = _traced_pipeline(tmp_path, "Ada")
+    real = pipe.extractor.extract
+    pipe.extractor.extract = lambda page, hint: real(page, hint).model_copy(update={"stage": "growth/large"})
+    r = pipe.process("https://useshiplog.com", "hn")
+    assert r.outcome == "skipped" and "is growth/large stage" in r.detail
+
+
+def test_early_and_unknown_stages_are_not_skipped(tmp_path: Path):
+    pipe = _traced_pipeline(tmp_path, "Shiplog was started by Ada.")
+    real = pipe.extractor.extract
+    from types import SimpleNamespace as NS
+    from src.enrichment.email_finder import EmailResult
+
+    for i, stage in enumerate(("unknown", "pre-seed/seed", "early")):
+        pipe.extractor.extract = lambda page, hint, s=stage: real(page, hint).model_copy(update={"stage": s})
+        pipe.finder = NS(find=lambda *a, idx=i: EmailResult(f"founder{idx}@example.com", "heuristic", "pattern from site"))
+        r = pipe.process(f"https://stage-test-{i}.dev", "hn")
+        assert r.outcome == "drafted"
+
+
+def test_include_large_flag_allows_growth_large_company(tmp_path: Path):
+    pipe = _traced_pipeline(tmp_path, "Shiplog was started by Ada.")
+    pipe.include_large = True
+    real = pipe.extractor.extract
+    pipe.extractor.extract = lambda page, hint: real(page, hint).model_copy(update={"stage": "growth/large"})
+    r = pipe.process("https://useshiplog.com", "hn")
+    assert r.outcome == "drafted"
+
+
 def test_non_software_companies_are_skipped_before_any_lookup(tmp_path: Path):
     pipe = _traced_pipeline(tmp_path, "Ada")
     real = pipe.extractor.extract
@@ -965,6 +1022,31 @@ def test_a_device_in_a_software_domain_is_kept():
     assert not clearly_not_software(_company("Other"))  # software, just not in a listed domain
 
 
+def test_profile_keywords_pick_the_paragraph_whatever_the_model_says(tmp_path: Path):
+    cricket = _company("Other", one_line_summary="Live cricket scoring for local clubs.")
+    assert "ExampleScore" in generate_email(cricket, PROFILE).body  # "cricket" is a Sports keyword
+    assert "ExampleScore" in generate_email(_company("B2B SaaS", one_line_summary="Sports analytics."), PROFILE).body
+    # whole words only: "transport" is not "sport"; and no keyword means the model's domain decides
+    assert "ExampleCRM" in generate_email(_company("Other", one_line_summary="Transport routing."), PROFILE).body
+    assert "ExampleScan" in generate_email(_company("DevTools"), PROFILE).body
+    assert "ExampleCRM" in generate_email(cricket, dataclasses.replace(PROFILE, keywords={})).body
+
+    bad = json.loads((ROOT / "profile.example.json").read_text("utf-8"))
+    bad["keywords"] = {"Chess": ["chess"]}  # no "Chess" entry under projects
+    (tmp_path / "p.json").write_text(json.dumps(bad), encoding="utf-8")
+    with pytest.raises(ProfileError, match="keywords"):
+        load_profile(tmp_path / "p.json")
+
+
+def test_a_keyword_topic_is_kept_even_when_it_is_hardware(tmp_path: Path):
+    pipe = _traced_pipeline(tmp_path, "Shiplog was started by Ada.")
+    real = pipe.extractor.extract
+    pipe.extractor.extract = lambda page, hint: real(page, hint).model_copy(
+        update={"business_type": "hardware", "core_domain": "Other",
+                "one_line_summary": "A cricket bat sensor with a coaching app."})
+    assert pipe.process("https://useshiplog.com", "hn").outcome == "drafted"
+
+
 def test_business_type_defaults_to_software():
     # an answer without the field (an older model reply, or one that leaves it out) is kept, never skipped
     assert _company("DevTools").business_type == "software"
@@ -988,6 +1070,33 @@ def test_eval_reports_software_startups_the_model_would_skip():
                          row("rinse.com", "services", "services"), row("oklo.com", "hardware", "software")])
     assert summary["software_skipped"] == ["b.dev"]
     assert summary["non_software_caught"] == "1 of 2"
+
+
+def test_eval_reports_the_mean_and_range_across_runs():
+    from evals.run_evals import spread
+
+    runs = [{"sendable": 70.0, "founder_correct": 92.6, "founder_outcomes": {"invented": 1}, "core_domain": 88.9},
+            {"sendable": 53.3, "founder_correct": 88.9, "founder_outcomes": {}, "core_domain": 81.5}]
+    text = spread(runs)
+    assert "Across 2 runs" in text
+    assert "mean 61.6%   range 53.3-70%" in text  # ready to send
+    assert "mean 0.5   range 0-1" in text  # invented founders, as a count
+
+
+def test_eval_reports_startups_the_model_would_skip_as_large():
+    from evals.run_evals import score_row, summarize
+
+    def row(domain, large, stage):
+        label = {"domain": domain, "company_name": "Shiplog", "core_domain": "DevTools",
+                 "founder_first_name": "Ada", "founder_last_name": "", "large": large}
+        return score_row(label, {**_company("DevTools").model_dump(), "stage": stage}, None)
+
+    summary = summarize([row("tiny.dev", "", "growth/large"), row("big.com", "yes", "growth/large"),
+                         row("huge.com", "yes", "unknown"), row("seed.dev", "no", "early")])
+    assert summary["startups_skipped_as_large"] == ["tiny.dev"]
+    assert summary["large_caught"] == "1 of 2"
+    # answers without a stage (main today) score as "nothing skipped"
+    assert summarize([row("x.dev", "", None)])["startups_skipped_as_large"] == []
 
 
 def test_eval_scores_wrong_website_catches():

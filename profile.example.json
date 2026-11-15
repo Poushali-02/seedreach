@@ -17,6 +17,8 @@
     "Fintech": ["I built ExamplePay, a payments ledger service with idempotent transaction APIs on PostgreSQL."],
     "AI Agents": ["I built ExampleAgent, a tool-calling agent loop with typed guardrails."],
     "B2B SaaS": ["I built ExampleCRM, a multi-tenant API with role-based access."],
+    "Sports": ["I interned at ExampleScore, a match analytics startup, building the APIs behind its live scoring."],
     "Other": ["I built ExampleCRM, a multi-tenant API with role-based access."]
-  }
+  },
+  "keywords": {"Sports": ["sport", "cricket", "football"]}
 }

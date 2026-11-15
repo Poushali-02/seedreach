@@ -75,6 +75,7 @@ Edit `profile.json`. It is git-ignored, so your details stay on your machine.
 | `experience` | yes | One or two sentences about your most relevant experience. (long emails) |
 | `stack` | yes | Your core technologies, as a phrase. |
 | `projects` | yes | Paragraphs per company domain: `DevTools`, `Fintech`, `AI Agents`, `B2B SaaS`, and a required `Other` fallback. Short emails use the **first sentence of the first paragraph**, so make that sentence your strongest proof (e.g. `I built Angizo (1st prize, Hexafalls 2026), ...`). |
+| `keywords` | no | Your own topics, e.g. `{"Sports": ["sport", "cricket"]}` with a `"Sports"` entry under `projects`. When one of the words is in what the company does (whole words, plurals too), that entry is used instead of the domain's, and the company is never skipped as "not software". Use it where your experience beats a project, e.g. an internship in that field. |
 | `portfolio`, `github`, `linkedin`, `resume`, `phone` | no | Shown at the bottom. Blank ones are left out. |
 | `subject` | no | Subject line; `{company}` is replaced with the company name. |
 | `closing` | no | The closing line before your links. (long emails) |
@@ -220,6 +221,10 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
   a reactor maker) **and** fits none of the software domains; the reason says what it does. A company that
   sells software to any industry counts as software, and so does an AI device filed under AI Agents or one
   the model isn't sure about. `SKIP_NON_SOFTWARE=0` keeps them all.
+- **Growth and large companies**: seedreach is aimed at early-stage startups, so companies the model reads
+  as clearly past early stage (public companies, Series C or later, or hundreds of employees, such as Discord
+  or Datadog) are skipped before any email lookup. When clues are thin or the model is unsure, the company is kept.
+  Pass `--include-large` to `run` or `target` to process them anyway.
 - **Job-alert emails** (`JOB_ALERTS=1`, off by default): portals such as Naukri forbid scraping, but they
   email you the roles matching the alerts you set up there. With this on, each `run` reads those emails
   from the last 3 days (`JOB_ALERT_DAYS`) and lists every new internship in the digest under *From your
@@ -263,7 +268,8 @@ Model: `gemini-flash-lite-latest`, 2 runs, 2026-11-14 (v0.5.0).
 
 The opening lines in these runs haven't been checked by hand (the last check found every claim true in
 93% of them), so "ready to send" counts only the rule checks and is a little high. With 30 startups, one
-company is about 3–4 points, so differences of a point or two between versions are noise.
+company is about 3–4 points. Single runs also vary a lot on their own (the same code scored 70% and 53%
+on two runs on 15 Nov), so versions are compared on the mean of at least 5 runs each.
 
 How it got here, on the same 30 startups:
 
@@ -277,9 +283,9 @@ Known gaps, each the subject of a follow-up:
 
 - **Board members**: one site lists a real co-founder only under "Board of Directors", and the model
   sometimes names him anyway.
-- **Company fit**: companies that clearly don't build software are skipped since v0.5.0 (#46), but
-  without an Apollo key, larger companies from Hacker News threads can still get drafts. A fix is planned
-  in [#2](https://github.com/Poushali-02/seedreach/issues/2).
+- **Company fit**: companies that clearly don't build software (#46) and companies clearly past early stage
+  (#2) are skipped before lookups, though early-stage startups with sparse websites are kept by default to
+  avoid false skips.
 - **Domains**: reading more pages made the domain slightly less accurate and less stable; consumer and
   health companies are sometimes filed as B2B SaaS or AI Agents.
 

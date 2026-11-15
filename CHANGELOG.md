@@ -6,7 +6,21 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 ## [Unreleased]
 
 ### Added
+- Skip growth and large stage companies in leads (#2). The extractor now classifies company stage
+  (`pre-seed/seed`, `early`, `growth/large`, `unknown`) while reading the site. Companies clearly past
+  early stage (public companies, Series C or later, or hundreds of employees) are recorded as skipped
+  before any email lookup. If the model is unsure, the company is kept. `--include-large` on `run` and
+  `target` allows processing them when desired.
+- `keywords` in `profile.json`: your own topics, picked by words and not by the model. With
+  `"keywords": {"Sports": ["sport", "cricket"]}` and a `"Sports"` entry under `projects`, a company whose
+  description has one of those words gets that paragraph (say, your internship at a sports startup)
+  instead of its domain's, and is never skipped as "not software". The model's instructions are
+  unchanged, so the eval scores are too.
 - Import target companies from a CSV file (`main.py add-target --csv companies.csv`): reads a `url` or `website` column, dedupes against already tracked companies, skips invalid rows with a message, and prints a summary (#4).
+
+### Fixed
+- A Gemini timeout or dropped connection stopped the whole run with a traceback. It is now retried like
+  a busy server (3 times), and if it lasts, that company is reported as an error and the run moves on.
 
 ## [0.6.0] - 2026-11-14
 
