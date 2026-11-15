@@ -105,6 +105,9 @@ def score_row(label: dict[str, str], pred: Optional[dict[str, Any]], hook_ok: Op
                               and pred.get("core_domain") == "Other"),
         "pred_domain": pred.get("core_domain"),
         "true_domain": label["core_domain"],
+        # #2: labels.csv may have a "large" column (yes/no); blank counts as a startup
+        "is_large": (label.get("large") or "").strip().lower() == "yes",
+        "pred_large": pred.get("stage") == "growth/large",
     }
     result["sendable"] = bool(
         right_site and not result["flagged_not_company"] and result["name_ok"] and result["domain_ok"] and result["founder"] == "correct"
@@ -142,6 +145,10 @@ def summarize(results: list[dict[str, Any]]) -> dict[str, Any]:
         "software_skipped": [r["domain"] for r in on_site if r["is_software"] and not r["pred_software"]],
         "non_software_caught": f"{sum(not r['pred_software'] for r in on_site if not r['is_software'])}"
                                f" of {sum(not r['is_software'] for r in on_site)}",
+        # #2: startups the model would skip as large (must stay 0), and large companies it catches
+        "startups_skipped_as_large": [r["domain"] for r in on_site if r.get("pred_large") and not r.get("is_large")],
+        "large_caught": f"{sum(r.get('pred_large', False) for r in on_site if r.get('is_large'))}"
+                        f" of {sum(r.get('is_large', False) for r in on_site)}",
         "domain_confusions": dict(Counter(
             f"{r['true_domain']} -> {r['pred_domain']}" for r in on_site if not r["domain_ok"]
         )),
@@ -205,6 +212,9 @@ def print_report(summary: dict[str, Any], title: str) -> None:
         f"(company sites wrongly flagged: {summary['company_site_flagged']})",
         f"  software skipped       {len(summary['software_skipped'])}   {summary['software_skipped'] or ''}",
         f"  non-software caught    {summary['non_software_caught']}",
+        f"  startups skipped large {len(summary['startups_skipped_as_large'])}   "
+        f"{summary['startups_skipped_as_large'] or ''}",
+        f"  large caught           {summary['large_caught']}",
         f"  READY TO SEND          {summary['sendable']}%",
     ]
     if summary["domain_confusions"]:
@@ -212,12 +222,25 @@ def print_report(summary: dict[str, Any], title: str) -> None:
     print("\n".join(line for line in lines if line))
 
 
+def spread(runs: list[dict[str, Any]]) -> str:
+    """Mean and range across repeats. One run is not a measurement: the same code can differ by 15+ points."""
+    def line(label: str, values: list[float], unit: str = "%") -> str:
+        return f"  {label:22} mean {sum(values) / len(values):.1f}{unit}   range {min(values):g}-{max(values):g}{unit}"
+    return "\n".join([
+        f"\nAcross {len(runs)} runs (compare versions on these, never on a single run)",
+        line("READY TO SEND", [r["sendable"] for r in runs]),
+        line("founder correct", [r["founder_correct"] for r in runs]),
+        line("invented founders", [r["founder_outcomes"].get("invented", 0) for r in runs], unit=""),
+        line("core domain", [r["core_domain"] for r in runs]),
+    ])
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--labels", type=Path, default=DATA / "labels.csv")
     parser.add_argument("--pages", type=Path, default=DATA / "pages", help="saved pages to score against")
     parser.add_argument("--live", action="store_true", help="re-run the extractor instead of using saved answers")
-    parser.add_argument("-n", "--repeats", type=int, default=3, help="runs per page with --live")
+    parser.add_argument("-n", "--repeats", type=int, default=5, help="runs per page with --live")
     args = parser.parse_args()
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
 
@@ -232,6 +255,7 @@ def main() -> None:
         out["stability"] = stability(runs)
         for i, summary in enumerate(out["runs"], 1):
             print_report(summary, f"Live run {i}/{args.repeats} ({out['model']})")
+        print(spread(out["runs"]))
         print(f"\nSame domain and founder verdict in every run: {out['stability']['stable']}%"
               f"  unstable: {', '.join(out['stability']['unstable_rows']) or 'none'}")
     else:
