@@ -1,0 +1,9 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "a1c86fc4d5a0c9404d8a9d371339f66637627deb",
+  "branch": "feat/sports-domain",
+  "prompts": {},
+  "integrity": {"v":1,"commit":"a1c86fc4d5a0c9404d8a9d371339f66637627deb","tree":"498a85404677f40d6ddcd0bb73915fdeeef4419c","files":{},"digest":"554a6acf7622563fbba800ce278da63a327e1451031413921fc9ceb140e6f567"}
+}
