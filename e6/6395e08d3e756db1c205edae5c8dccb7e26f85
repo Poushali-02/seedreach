@@ -1,0 +1,100 @@
+.env.example
+  s_21f759cbef9c39::t_9459df98905dc6 63
+CHANGELOG.md
+  s_21f759cbef9c39::t_4c58d5bafc83e6 9-11
+README.md
+  s_21f759cbef9c39::t_a6fbbc60c3aad6 238-240
+src/config.py
+  s_21f759cbef9c39::t_d1754d122b1d2b 69
+src/sourcing/job_alerts.py
+  s_21f759cbef9c39::t_103a21b0363fc1 15
+  s_21f759cbef9c39::t_cf15120cc56143 29
+  s_21f759cbef9c39::t_47776b1dd9ba97 70-98,102
+tests/fixtures/job_alerts/linkedin_similar_jobs.html
+  s_21f759cbef9c39::t_28b36b46c53216 1-64
+tests/test_job_alerts.py
+  s_21f759cbef9c39::t_a34693427c26c6 40-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "e66395e08d3e756db1c205edae5c8dccb7e26f85",
+  "branch": "feat/linkedin-job-emails-36",
+  "prompts": {
+    "s_21f759cbef9c39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2444be44-c998-49de-b6bd-587e1d94a941",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:fa38e070518c639f83f4450eca406c1514b08dc171751dbbb04acd94a7521572",
+      "total_additions": 126,
+      "total_deletions": 5,
+      "accepted_lines": 126,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_21f759cbef9c39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2444be44-c998-49de-b6bd-587e1d94a941",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:fa38e070518c639f83f4450eca406c1514b08dc171751dbbb04acd94a7521572",
+      "stats": {
+        "total_additions": 126,
+        "total_deletions": 5,
+        "accepted_lines": 126,
+        "overriden_lines": 0,
+        "files": {
+          ".env.example": {
+            "total_additions": 1,
+            "total_deletions": 1,
+            "accepted_lines": 1,
+            "overriden_lines": 0
+          },
+          "CHANGELOG.md": {
+            "total_additions": 3,
+            "total_deletions": 0,
+            "accepted_lines": 3,
+            "overriden_lines": 0
+          },
+          "README.md": {
+            "total_additions": 3,
+            "total_deletions": 2,
+            "accepted_lines": 3,
+            "overriden_lines": 0
+          },
+          "src/config.py": {
+            "total_additions": 1,
+            "total_deletions": 1,
+            "accepted_lines": 1,
+            "overriden_lines": 0
+          },
+          "src/sourcing/job_alerts.py": {
+            "total_additions": 32,
+            "total_deletions": 1,
+            "accepted_lines": 32,
+            "overriden_lines": 0
+          },
+          "tests/fixtures/job_alerts/linkedin_similar_jobs.html": {
+            "total_additions": 64,
+            "total_deletions": 0,
+            "accepted_lines": 64,
+            "overriden_lines": 0
+          },
+          "tests/test_job_alerts.py": {
+            "total_additions": 22,
+            "total_deletions": 0,
+            "accepted_lines": 22,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  },
+  "integrity": {"v":1,"commit":"e66395e08d3e756db1c205edae5c8dccb7e26f85","tree":"b9b51b1ee7d1ec0c5495c9079e64a0f6bff65457","files":{".env.example":"2269cbdbb38b632e8383c822b43b9c1ef6bb0b12","CHANGELOG.md":"29007d680140ae8a22fbfa5384877d063ca6a4fa","README.md":"55438cd894478796375371d88ded89591683ffa4","src/config.py":"e60eea5683e0d041beeafa3302593e990cbfcb2e","src/sourcing/job_alerts.py":"b68433d0cbaf3b7ca7663f1f3b5231a3fbf5d134","tests/fixtures/job_alerts/linkedin_similar_jobs.html":"9268ace363788e3bfe96521707b4b4e51bdf0da5","tests/test_job_alerts.py":"a1bcfa6e74019a30c9b9be8e03834cbd049fbabf"},"digest":"f76b818a37ea2b1e4cf044889253e05cd89b8e5e49a6b82920fbfd2c0813b2fb"}
+}
