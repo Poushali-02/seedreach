@@ -1,0 +1,60 @@
+evals/run_evals.py
+  s_21f759cbef9c39::t_73963e33636fa9 225-237
+  s_21f759cbef9c39::t_82e4f10760c93e 243
+  s_21f759cbef9c39::t_458c83c2f88910 258
+tests/test_core.py
+  s_21f759cbef9c39::t_fe70f36679cae3 881-891
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "8155c160bbddf39a8ec1a84ce2e6e4bc0141cf38",
+  "branch": "evals/large-company-rule",
+  "prompts": {
+    "s_21f759cbef9c39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2444be44-c998-49de-b6bd-587e1d94a941",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:0b0d0d2588873894d690db407f77e94c0e927f0a7cfc107f5cf19c98a34490d1",
+      "total_additions": 26,
+      "total_deletions": 1,
+      "accepted_lines": 26,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_21f759cbef9c39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2444be44-c998-49de-b6bd-587e1d94a941",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:0b0d0d2588873894d690db407f77e94c0e927f0a7cfc107f5cf19c98a34490d1",
+      "stats": {
+        "total_additions": 26,
+        "total_deletions": 1,
+        "accepted_lines": 26,
+        "overriden_lines": 0,
+        "files": {
+          "evals/run_evals.py": {
+            "total_additions": 15,
+            "total_deletions": 1,
+            "accepted_lines": 15,
+            "overriden_lines": 0
+          },
+          "tests/test_core.py": {
+            "total_additions": 11,
+            "total_deletions": 0,
+            "accepted_lines": 11,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  },
+  "integrity": {"v":1,"commit":"8155c160bbddf39a8ec1a84ce2e6e4bc0141cf38","tree":"64db9ec3e168ae4a80323da73f1b43505616b8d2","files":{"evals/run_evals.py":"825e9275f95f961589e2dcf8ff1edbb001e2ff2e","tests/test_core.py":"758755a59f93060082c396c6ef12337e858d9d3e"},"digest":"e9cb0b2966121491565fa0bd4b005562e0e89eecf5017c9338e9f4a11b0202cf"}
+}
