@@ -1,0 +1,74 @@
+evals/README.md
+  s_21f759cbef9c39::t_1b4be2768b832f 45
+evals/run_evals.py
+  s_21f759cbef9c39::t_1b4be2768b832f 108-110,148-151,215-217
+  s_21f759cbef9c39::t_73963e33636fa9 225-237
+  s_21f759cbef9c39::t_82e4f10760c93e 243
+  s_21f759cbef9c39::t_458c83c2f88910 258
+tests/test_core.py
+  s_21f759cbef9c39::t_fb0b81038b55aa 274-300
+  s_21f759cbef9c39::t_fe70f36679cae3 938-948
+  s_21f759cbef9c39::t_85c794c22d4012 949-964
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "38afd3f28ad36a7fba5393c2c81dc67f9c2070cd",
+  "prompts": {},
+  "sessions": {
+    "s_21f759cbef9c39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2444be44-c998-49de-b6bd-587e1d94a941",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:671a708ca6a2e71eae3988b4cad0210d08aa8237c6c80a129c6e78e5049f0be6",
+      "stats": {
+        "total_additions": 61,
+        "total_deletions": 11,
+        "accepted_lines": 61,
+        "overriden_lines": 0,
+        "files": {
+          "README.md": {
+            "total_additions": 7,
+            "total_deletions": 3,
+            "accepted_lines": 7,
+            "overriden_lines": 0
+          },
+          "docs/ARCHITECTURE.md": {
+            "total_additions": 4,
+            "total_deletions": 2,
+            "accepted_lines": 4,
+            "overriden_lines": 0
+          },
+          "main.py": {
+            "total_additions": 8,
+            "total_deletions": 4,
+            "accepted_lines": 8,
+            "overriden_lines": 0
+          },
+          "src/intelligence/extractor.py": {
+            "total_additions": 6,
+            "total_deletions": 0,
+            "accepted_lines": 6,
+            "overriden_lines": 0
+          },
+          "src/pipeline.py": {
+            "total_additions": 5,
+            "total_deletions": 1,
+            "accepted_lines": 5,
+            "overriden_lines": 0
+          },
+          "tests/test_core.py": {
+            "total_additions": 31,
+            "total_deletions": 1,
+            "accepted_lines": 31,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  },
+  "integrity": {"v":1,"commit":"38afd3f28ad36a7fba5393c2c81dc67f9c2070cd","tree":"c0dc278c754ccdad6113bdc2acc5153fccb9f79f","files":{"evals/README.md":"cd7c67bd80c7ca0f4f6994a2eeee5eb789f4cc05","evals/run_evals.py":"825e9275f95f961589e2dcf8ff1edbb001e2ff2e","tests/test_core.py":"ca02f32ed78484175486e8376159c6de5c9fba26"},"digest":"ed36683e3b7150d2b94b0e9109afa82902e6f213464c61dc356dc26dcfd1f365"}
+}
