@@ -24,7 +24,9 @@ class Settings(BaseSettings):
 
     llm_provider: Literal["gemini", "anthropic"] = "gemini"
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-flash-lite-latest"
+    # A named model, not a "-latest" alias: an alias can start answering as a different model overnight,
+    # which changes drafts and makes eval scores impossible to compare. Update it when Google retires it.
+    gemini_model: str = "gemini-3.5-flash-lite"
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-haiku-5-5"
     apollo_api_key: str = ""
