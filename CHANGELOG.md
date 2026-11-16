@@ -5,6 +5,8 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+- Show recent job openings from alert emails in `python main.py status` (#83).
+
 ## [0.8.0] - 2026-11-20
 
 After the email: seedreach now sees which drafts you sent and who replied or bounced, and drafts one

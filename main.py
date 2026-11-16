@@ -395,6 +395,20 @@ def status(events: int = typer.Option(10, "--events", "-e", help="How many recen
             find = linkedin_people_search(r["founder_name"], r["company_name"] or "") if r["founder_name"] else "-"
             table.add_row(r["domain"], r["company_name"] or "-", r["founder_name"] or "-", r["reason"], find)
         console.print(table)
+    alerts = db.recent_alert_jobs(10)
+    if alerts:
+        table = Table(title="From your job alerts")
+        for col in ("Company", "Role", "Location", "Portal", "First seen"):
+            table.add_column(col)
+        for row in alerts:
+            table.add_row(
+                row["company"],
+                row["role"],
+                row["location"] or "-",
+                row["portal"],
+                row["first_seen"],
+            )
+        console.print(table)
     log_rows = db.recent_events(events)
     if log_rows:
         console.print("\n[bold]Recent events[/bold]")
