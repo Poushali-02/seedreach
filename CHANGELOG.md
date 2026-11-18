@@ -21,6 +21,12 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   unchanged, so the eval scores are too.
 - Import target companies from a CSV file (`main.py add-target --csv companies.csv`): reads a `url` or `website` column, dedupes against already tracked companies, skips invalid rows with a message, and prints a summary (#4).
 
+### Changed
+- The default Gemini model is now the named `gemini-3.5-flash-lite`, not the `gemini-flash-lite-latest` alias. It is the model
+  the alias answered as on 15 Nov 2026, so nothing changes today; it stops the model changing silently,
+  which would shift drafts and make eval scores impossible to compare. If you set `GEMINI_MODEL`
+  yourself, nothing changes for you.
+
 ### Fixed
 - A Gemini timeout or dropped connection stopped the whole run with a traceback. It is now retried like
   a busy server (3 times), and if it lasts, that company is reported as an error and the run moves on.

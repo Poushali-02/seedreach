@@ -100,7 +100,7 @@ cp .env.example .env                     # Windows: copy .env.example .env
 | Variable | Default | Notes |
 |---|---|---|
 | `LLM_PROVIDER` | `gemini` | `gemini` or `anthropic` |
-| `GEMINI_MODEL` | `gemini-flash-lite-latest` | An alias that survives model retirements. If requests keep failing as "busy", try another model id from AI Studio. |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | A named model, so drafts and eval scores don't change when Google moves its `-latest` aliases (on 15 Nov 2026, `gemini-flash-lite-latest` answered as this model). When Google retires it, or requests keep failing as "busy", set another model id from AI Studio. |
 | `ANTHROPIC_MODEL` | `claude-haiku-5-5` | Any Claude model id |
 | `APOLLO_API_KEY` | empty | Optional. Apollo's person lookup is a paid-plan API, so most people leave it blank. |
 
