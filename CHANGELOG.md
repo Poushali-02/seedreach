@@ -45,6 +45,7 @@ follow-up for those that went quiet.
 Fewer wasted drafts: big companies are skipped, LinkedIn job emails are read, and targets can come from a CSV.
 
 ### Added
+
 - LinkedIn's job emails are read too (#36): with `JOB_ALERTS=1`, new internships from emails such as
   "New jobs similar to ..." (`jobs-noreply@linkedin.com`) are listed in the digest with the company,
   role, place and a plain link to the job page, without LinkedIn's tracking parts.

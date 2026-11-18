@@ -406,7 +406,7 @@ def status(events: int = typer.Option(10, "--events", "-e", help="How many recen
                 row["role"],
                 row["location"] or "-",
                 row["portal"],
-                row["first_seen"],
+                row["first_seen"][:10],
             )
         console.print(table)
     log_rows = db.recent_events(events)
