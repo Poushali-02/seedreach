@@ -253,19 +253,25 @@ Then open Gmail > Drafts, review each draft, and send the ones you like yourself
 
 Measured on 30 real startups that seedreach found, each checked by hand against its website (company
 name, domain, every founder the site names, and whether every claim in the opening line is true).
-Model: `gemini-flash-lite-latest`, 2 runs, 2026-11-14 (v0.5.0).
+Model: `gemini-3.5-flash-lite`, 5 runs, 2026-11-18 (v0.7.0). Mean, with the range across runs.
 
 | Metric | Score | What it means |
 |---|---|---|
 | Company name | 96% | Right name for the company |
-| Domain | 89–93% | Right category, so the right project of yours gets pitched |
-| Founder correct | 89–93% | One of the site's founders, or correctly none when the site names no founder |
-| Invented founder | 4–7% | Named someone the site doesn't call a founder (the worst mistake: a wrong name in the greeting) |
-| Opening line follows the rules | 100% | One sentence, no flattery, no markdown |
-| Wrong website caught | 100% | A news article or job posting is recognised and skipped, not drafted |
-| Software startups skipped | 0 | Real software startups wrongly skipped as "not software" (must stay 0) |
-| Same answers on every run | 93% | Same domain and founder each time on the same page |
-| Ready to send | 70–73% | Everything above right at once, on the right website |
+| Domain | 91% (89–93%) | Right category, so the right project of yours gets pitched |
+| Founder correct | 84% (82–89%) | One of the site's founders, or correctly none when the site names no founder |
+| Invented founder | 7.5% (0–12%) | Named someone the site doesn't call a founder (the worst mistake: a wrong name in the greeting) |
+| Opening line follows the rules | 99% | One sentence, no flattery, no markdown |
+| Wrong website caught | 2–3 of 3 | A news article or job posting is recognised and skipped, not drafted |
+| Software startups skipped | 1 in 5 runs | Real software startups wrongly skipped as "not software" (should be 0) |
+| Large companies caught | 4–6 of 7 | Public, Series C or later, or 200+ people: skipped, as intended (#2) |
+| Startups skipped as large | 1–2 | Close (seed-funded, 120 people) in every run, SentiLink in one |
+| Same answers on every run | 70% | Same domain and founder each time on the same page |
+| Ready to send | 65% (63–67%) | Everything above right at once, on the right website |
+
+The same 5 runs on the code before the large-company skip scored 68% ready to send (67–70%) and 89%
+founder correct, but caught none of the large companies. Most of the difference is two startups whose
+founder the model now gets wrong more often (Netbird, SentiLink).
 
 The opening lines in these runs haven't been checked by hand (the last check found every claim true in
 93% of them), so "ready to send" counts only the rule checks and is a little high. With 30 startups, one
@@ -279,6 +285,7 @@ How it got here, on the same 30 startups:
 | Baseline | 63% | 11% | 43% |
 | Count only people the site calls a founder | 74% | 0% | 53–57% |
 | Scraper reads team and leadership pages first | 93–100% | 0–4% | 63–70% |
+| Skip large companies (#2), new model, 5 runs instead of 2 | 84% | 7.5% | 65% |
 
 Known gaps, each the subject of a follow-up:
 
@@ -286,7 +293,9 @@ Known gaps, each the subject of a follow-up:
   sometimes names him anyway.
 - **Company fit**: companies that clearly don't build software (#46) and companies clearly past early stage
   (#2) are skipped before lookups, though early-stage startups with sparse websites are kept by default to
-  avoid false skips.
+  avoid false skips. A bootstrapped company that says it has thousands of customers and has been profitable
+  for years (Close) is read as large; telling the model to ignore those clues made it miss most real large
+  companies instead, so it was left as is.
 - **Domains**: reading more pages made the domain slightly less accurate and less stable; consumer and
   health companies are sometimes filed as B2B SaaS or AI Agents.
 

@@ -5,6 +5,10 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-19
+
+Fewer wasted drafts: big companies are skipped, LinkedIn job emails are read, and targets can come from a CSV.
+
 ### Added
 - LinkedIn's job emails are read too (#36): with `JOB_ALERTS=1`, new internships from emails such as
   "New jobs similar to ..." (`jobs-noreply@linkedin.com`) are listed in the digest with the company,
@@ -248,7 +252,8 @@ First public release.
 - `HEADLESS` mode and a GitHub Actions template for scheduled runs from a private repo.
 - Contributing guide, security policy, issue templates and CI on Python 3.10 and 3.13.
 
-[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/Poushali-02/seedreach/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Poushali-02/seedreach/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/Poushali-02/seedreach/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/Poushali-02/seedreach/compare/v0.5.0...v0.5.1
