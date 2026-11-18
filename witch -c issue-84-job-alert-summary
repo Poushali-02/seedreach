@@ -1,0 +1,86 @@
+[1mdiff --git a/CHANGELOG.md b/CHANGELOG.md[m
+[1mindex 399dc73..83e8733 100644[m
+[1m--- a/CHANGELOG.md[m
+[1m+++ b/CHANGELOG.md[m
+[36m@@ -9,6 +9,8 @@[m [mAll notable changes to seedreach are listed here. Versions follow [semantic vers[m
+ - LinkedIn's job emails are read too (#36): with `JOB_ALERTS=1`, new internships from emails such as[m
+   "New jobs similar to ..." (`jobs-noreply@linkedin.com`) are listed in the digest with the company,[m
+   role, place and a plain link to the job page, without LinkedIn's tracking parts.[m
+[32m+[m[32m- Telegram and Discord run summaries now include the count of new job-alert openings when there are any.[m
+[32m+[m[32m  The summary contains no email addresses or apply links.[m
+ - Skip growth and large stage companies in leads (#2). The extractor now classifies company stage[m
+   (`pre-seed/seed`, `early`, `growth/large`, `unknown`) while reading the site. Companies clearly past[m
+   early stage (public companies, Series C or later, or hundreds of employees) are recorded as skipped[m
+[1mdiff --git a/README.md b/README.md[m
+[1mindex 699ca29..c567979 100644[m
+[1m--- a/README.md[m
+[1m+++ b/README.md[m
+[36m@@ -340,9 +340,10 @@[m [minternships with apply links, founders to reach on LinkedIn (when only a generic[m
+ found) and drafts to review. It has company names and links only, never email addresses. Nothing to report[m
+ means no comment.[m
+ [m
+[31m-For a one-line summary on Telegram or Discord as well ("3 new drafts: HillStar, Alter · 2 skipped"), add[m
+[31m-the secrets `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, and/or `DISCORD_WEBHOOK_URL`. It lists company[m
+[31m-names and counts only, never founder addresses or draft text. It's sent after real runs, not dry runs.[m
+[32m+[m[32mFor a one-line summary on Telegram or Discord as well ("3 new drafts: HillStar, Alter · 2 skipped · 4 new[m
+[32m+[m[32mfrom job alerts"), add the secrets `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, and/or `DISCORD_WEBHOOK_URL`.[m
+[32m+[m[32mIt lists company names and counts only, including the count of new job-alert openings when there are any;[m
+[32m+[m[32mit never includes email addresses, apply links or draft text. It's sent after real runs, not dry runs.[m
+ [m
+ - **Telegram**: message [@BotFather](https://t.me/BotFather), send `/newbot` and follow the prompts; it[m
+   replies with the bot token. Send any message to your new bot, then open[m
+[1mdiff --git a/main.py b/main.py[m
+[1mindex 4715af0..f900920 100644[m
+[1m--- a/main.py[m
+[1m+++ b/main.py[m
+[36m@@ -126,7 +126,7 @@[m [mdef run([m
+         digest.write_text(build_digest(results, dry_run=dry_run, alerts=alerts), encoding="utf-8")[m
+     counts = _summary(results, dry_run)[m
+     if not dry_run:  # before the exit below, so a failed run still reports[m
+[31m-        send_summary(build_summary(results), get_settings())[m
+[32m+[m[32m        send_summary(build_summary(results, len(alerts)), get_settings())[m
+     _run_stats(pipe.traces)[m
+     if counts["error"] and not counts["drafted"]:[m
+         raise typer.Exit(1)  # every attempt failed (LLM or Gmail outage): let schedulers flag the run[m
+[1mdiff --git a/src/notify.py b/src/notify.py[m
+[1mindex f4f8107..7a879a4 100644[m
+[1m--- a/src/notify.py[m
+[1m+++ b/src/notify.py[m
+[36m@@ -24,8 +24,8 @@[m [mdef _name(result: Result) -> str:[m
+     return display_name(result.company) if result.company else result.domain[m
+ [m
+ [m
+[31m-def build_summary(results: list[Result]) -> str:[m
+[31m-    """e.g. 'seedreach: 3 new drafts: HillStar, Alter, Rhem Labs · 2 skipped'."""[m
+[32m+[m[32mdef build_summary(results: list[Result], alert_count: int = 0) -> str:[m
+[32m+[m[32m    """e.g. 'seedreach: 3 new drafts: HillStar, Alter · 2 skipped · 4 new from job alerts'."""[m
+     drafted = [_name(r) for r in results if r.outcome == "drafted"][m
+     skipped = sum(r.outcome == "skipped" for r in results)[m
+     errors = sum(r.outcome == "error" for r in results)[m
+[36m@@ -35,6 +35,8 @@[m [mdef build_summary(results: list[Result]) -> str:[m
+     else:[m
+         head = "no new drafts"[m
+     parts = [head, f"{skipped} skipped"][m
+[32m+[m[32m    if alert_count:[m
+[32m+[m[32m        parts.append(f"{alert_count} new from job alerts")[m
+     if errors:[m
+         parts.append(f"{errors} error{'s' if errors != 1 else ''}")[m
+     return "seedreach: " + " · ".join(parts)[m
+[1mdiff --git a/tests/test_core.py b/tests/test_core.py[m
+[1mindex 705b2d4..3e730dc 100644[m
+[1m--- a/tests/test_core.py[m
+[1m+++ b/tests/test_core.py[m
+[36m@@ -1409,6 +1409,13 @@[m [mdef test_summary_lists_company_names_only():[m
+     from src.pipeline import Result[m
+ [m
+     text = build_summary(_summary_results())[m
+[32m+[m[32m    alert_text = build_summary(_summary_results(), alert_count=2)[m
+[32m+[m[32m    assert alert_text == ([m
+[32m+[m[32m        "seedreach: 2 new drafts: HillStar, alter.dev · 2 skipped "[m
+[32m+[m[32m        "· 2 new from job alerts · 1 error"[m
+[32m+[m[32m    )[m
+[32m+[m[32m    assert "@" not in alert_text[m
+[32m+[m[32m    assert "https://" not in alert_text[m
+     assert text == "seedreach: 2 new drafts: HillStar, alter.dev · 2 skipped · 1 error"[m
+     assert "@" not in text  # skip and error reasons can hold addresses: never included[m
+     assert build_summary([Result("a.dev", "skipped", "x")]) == "seedreach: no new drafts · 1 skipped"[m

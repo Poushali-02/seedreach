@@ -24,8 +24,8 @@ def _name(result: Result) -> str:
     return display_name(result.company) if result.company else result.domain
 
 
-def build_summary(results: list[Result]) -> str:
-    """e.g. 'seedreach: 3 new drafts: HillStar, Alter, Rhem Labs · 2 skipped'."""
+def build_summary(results: list[Result], alert_count: int = 0) -> str:
+    """e.g. 'seedreach: 3 new drafts: HillStar, Alter · 2 skipped · 4 new from job alerts'."""
     drafted = [_name(r) for r in results if r.outcome == "drafted"]
     skipped = sum(r.outcome == "skipped" for r in results)
     errors = sum(r.outcome == "error" for r in results)
@@ -35,6 +35,8 @@ def build_summary(results: list[Result]) -> str:
     else:
         head = "no new drafts"
     parts = [head, f"{skipped} skipped"]
+    if alert_count:
+        parts.append(f"{alert_count} new from job alerts")
     if errors:
         parts.append(f"{errors} error{'s' if errors != 1 else ''}")
     return "seedreach: " + " · ".join(parts)
