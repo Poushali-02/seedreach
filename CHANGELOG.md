@@ -9,6 +9,12 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 - Telegram and Discord run summaries now include the count of new job-alert openings when there are any.
   The summary contains no email addresses or apply links.
 
+### Fixed
+- A website can no longer add recipients to your draft. A `mailto:` link that lists several addresses
+  (`mailto:someone@elsewhere.example,hello@company.com`) used to become the draft's whole To line, labelled
+  "on site". Each address in a `mailto:` link is now read on its own (encoded ones like `%40` included), and
+  only a single address at the company's own domain can be used.
+
 ## [0.7.0] - 2026-11-19
 
 Fewer wasted drafts: big companies are skipped, LinkedIn job emails are read, and targets can come from a CSV.

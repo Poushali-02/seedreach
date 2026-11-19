@@ -121,6 +121,26 @@ def _finder() -> EmailFinder:
     return EmailFinder(Settings(apollo_api_key=""))
 
 
+
+def test_a_site_cannot_add_recipients_through_a_mailto():
+    from src.intelligence.scraper import _parse
+
+    html = """<a href="mailto:evil@attacker.example,hello@acme.com">mail</a>
+    <a href="mailto:ada%40acme.com?subject=hi">Ada</a><a href="mailto:bob@acme.com;%20eve@acme.com">two</a>
+    <a href="mailto:not an address">x</a>"""
+    page, _ = _parse(html, "https://acme.com")
+    assert page.mailtos == ["evil@attacker.example", "hello@acme.com", "ada@acme.com", "bob@acme.com",
+                            "eve@acme.com"]
+
+    # the joined string from before is never usable as one address, and off-domain parts are dropped
+    f = _finder()
+    r = f.find("acme.com", "Acme", None, None, ["evil@attacker.example,hello@acme.com"])
+    assert r is None
+    r = f.find("acme.com", "Acme", None, None, page.mailtos)
+    assert r.email in {"hello@acme.com", "bob@acme.com", "eve@acme.com", "ada@acme.com"} and "," not in r.email
+    assert f.find("acme.com", "Acme", None, None, ["hello@notacme.com"]) is None  # suffix is not enough
+    assert f.find("acme.com", "Acme", None, None, ["hello@mail.acme.com"]).email == "hello@mail.acme.com"
+
 def test_mailto_prefers_founder_and_skips_support():
     f = _finder()
     r = f.find("x.com", "X", "Ada", None, ["support@x.com", "ada@x.com", "bob@other.com"])
