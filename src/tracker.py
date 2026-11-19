@@ -3,7 +3,11 @@
 Gmail deletes a draft when it's sent and keeps a new copy, labelled SENT, under a new id. So:
 - the draft is still in Drafts: not sent yet;
 - the draft is gone and Sent has a message to that address since the draft: sent;
-- after that, a message from that address: replied; a delivery failure naming it: bounced.
+- after that, a delivery failure naming it: bounced; a person's reply from the company's domain: replied.
+
+A reply has to look like one: a subject starting "Re:", from any address at the company's domain (founders often
+answer from a colleague's address), and not marked as automatic or bulk mail. Auto-replies ("Support request
+received", out of office) and product newsletters from the same company are not replies.
 
 Reading Sent and the inbox needs Gmail's read-only scope. Without it, only the first check works (it needs
 the draft scope alone), and a missing draft is recorded as "draft gone". Stages you set yourself with
@@ -13,18 +17,41 @@ the draft scope alone), and a missing draft is recorded as "draft gone". Stages 
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from email.utils import parseaddr
 from typing import Optional, Protocol
 
 from src.db import Database
+from src.outreach.gmail_client import header_date
 
 log = logging.getLogger(__name__)
+
+REPLY_HEADERS = ["Date", "From", "Subject", "Auto-Submitted", "X-Autoreply", "X-Autorespond", "Precedence"]
 
 
 class Mailbox(Protocol):
     def draft_exists(self, draft_id: str) -> bool: ...
     def message_dates(self, query: str, limit: int = 5) -> list[datetime]: ...
+    def message_headers(self, query: str, names: list[str], limit: int = 5) -> list[dict[str, str]]: ...
+
+
+def is_human_reply(headers: dict[str, str], domain: str) -> bool:
+    """A person answering your email: "Re:" subject, from the company's domain, not automatic or bulk mail
+    (RFC 3834's Auto-Submitted, the common X-Autoreply headers, Precedence). List-Unsubscribe is not a sign of
+    bulk mail here: founders who send through a mailing service (Brevo, say) get it on personal replies too.
+    Newsletters are left out by the "Re:" rule instead."""
+    host = parseaddr(headers.get("from", ""))[1].lower().rsplit("@", 1)[-1]
+    if not (host == domain or host.endswith("." + domain)):
+        return False
+    if not re.match(r"\s*re\s*:", headers.get("subject", ""), re.I):
+        return False
+    if headers.get("auto-submitted", "no").strip().lower() != "no":
+        return False
+    if headers.get("x-autoreply") or headers.get("x-autorespond"):
+        return False
+    return headers.get("precedence", "").strip().lower() not in ("bulk", "list", "junk", "auto_reply")
 
 
 @dataclass(frozen=True)
@@ -84,7 +111,9 @@ def _next_stage(row, address: str, stage: Optional[str], mailbox: Mailbox,
         bounced = mailbox.message_dates(f'from:mailer-daemon "{address}" after:{since}')
         if bounced:
             return ("bounced", _iso(min(bounced)))
-        replies = mailbox.message_dates(f"from:{address} after:{since}")
+        domain = address.rsplit("@", 1)[-1]
+        found = mailbox.message_headers(f"from:{domain} after:{since}", REPLY_HEADERS, limit=10)
+        replies = [d for h in found if is_human_reply(h, domain) and (d := header_date(h.get("date", "")))]
         if replies:
             return ("replied", _iso(min(replies)))
     return None

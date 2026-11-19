@@ -56,8 +56,8 @@ python main.py run --limit 5
    once. They don't enter the pipeline above: an alert names a company, not its website.
 5. **The tracker** (`src/tracker.py`, unless `TRACK_MAILBOX=0`) checks every drafted company still in
    play: a draft that left Drafts was sent or deleted; with Gmail read access (only if the token already
-   has it), a message in Sent to that address marks it `sent`, then a message from it `replied` and a
-   delivery failure naming it `bounced`. Stages set with `mark` (interview, offer, closed) are never
+   has it), a message in Sent to that address marks it `sent`, then a "Re:" message from the company's domain
+   that isn't automatic or bulk mail `replied`, and a delivery failure naming it `bounced`. Stages set with `mark` (interview, offer, closed) are never
    changed. `track` runs the same check on its own.
 6. **After the run**, `run --digest FILE` writes the digest (`src/digest.py`): roles to apply for,
    founders to reach on LinkedIn and drafts to review, with no email addresses; the scheduled-runs
