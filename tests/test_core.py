@@ -1535,7 +1535,8 @@ def test_cli_run_sends_summary_even_when_every_attempt_failed(monkeypatch: pytes
     results = [Result("down.dev", "error", "extraction failed")]
     monkeypatch.setattr(main, "_db", lambda: None)
     monkeypatch.setattr(main, "_pipeline", lambda db, dry_run, **kw: NS(
-        run=lambda *a, **k: results, job_alerts=lambda: [], traces=[], track=lambda: []))
+        run=lambda *a, **k: results, job_alerts=lambda: [], traces=[], track=lambda: [],
+        follow_up=lambda: []))
     sent = []
     monkeypatch.setattr(main, "send_summary", lambda text, settings: sent.append(text))
 
@@ -1579,7 +1580,7 @@ def _drafted(db, domain, draft_id):
 def test_tracker_migration_upgrades_an_old_database(tmp_path: Path):
     import sqlite3
 
-    from src.db import SCHEMA
+    from src.db import MIGRATIONS, SCHEMA
 
     path = tmp_path / "old.db"
     with sqlite3.connect(path) as conn:  # a database from before the tracker: schema only, user_version 0
@@ -1590,9 +1591,10 @@ def test_tracker_migration_upgrades_an_old_database(tmp_path: Path):
     db = Database(path)
     Database(path)  # opening again changes nothing
     with sqlite3.connect(path) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
         cols = {r[1] for r in conn.execute("PRAGMA table_info(companies)")}
-    assert {"stage", "stage_source", "stage_at", "sent_at", "replied_at"} <= cols
+    assert {"stage", "stage_source", "stage_at", "sent_at", "replied_at", "followup_draft_id",
+            "followed_up_at"} <= cols
     assert db.stage_counts() == {"drafted": 1} and db.drafted()[0]["founder_email"] == "ada@acme.com"
 
 
@@ -1726,3 +1728,104 @@ def test_only_a_persons_reply_counts():
     assert not is_human_reply(_reply("ada@acme.com", **{"x-autoreply": "yes"}), "acme.com")
     assert not is_human_reply(_reply("eve@notacme.com"), "acme.com")      # a look-alike domain
     assert is_human_reply(_reply("ada@acme.com", **{"auto-submitted": "no"}), "acme.com")
+
+
+# ---- follow-ups (#17) ------------------------------------------------------
+class _FakeDrafts:
+    """first_sent finds the original email; create_draft records what would be saved."""
+
+    def __init__(self, broken=()):
+        self.broken, self.created = set(broken), []
+
+    def first_sent(self, to, after):
+        from src.outreach.gmail_client import SentMessage
+        if to in self.broken:
+            raise RuntimeError("Gmail API error: 500")
+        return SentMessage(f"thread-{to}", f"<orig-{to}>", "Remote Backend/AI engineering internship - Due")
+
+    def create_draft(self, to, subject, body, reply_to=None):
+        self.created.append((to, subject, body, reply_to))
+        return f"draft-{len(self.created)}"
+
+
+def test_generate_followup_is_short_and_replies_in_the_same_thread():
+    from datetime import datetime, timezone
+
+    from src.outreach.generator import generate_followup
+
+    sent = datetime(2026, 11, 14, 8, 19, tzinfo=timezone.utc)
+    d = generate_followup("Acme, Inc.", "Ada Lovelace", PROFILE, sent, "Internship inquiry - Acme")
+    assert d.subject == "Re: Internship inquiry - Acme"
+    assert d.body.startswith("Hi Ada,\n\nFollowing up on my email from 14 November, in case it got buried.")
+    assert "Acme" in d.body and "Inc" not in d.body
+    assert len(d.body.split()) < 80 and not re.search(r"[*#`]", d.body)
+
+    team = generate_followup("Acme", None, PROFILE, sent, "Re: Internship inquiry - Acme")
+    assert team.body.startswith("Hi Acme team,") and team.subject == "Re: Internship inquiry - Acme"  # one "Re:"
+    assert generate_followup("Acme", "", PROFILE, sent).subject == "Re: " + PROFILE.subject.replace("{company}", "Acme")
+
+
+def test_followups_only_for_quiet_companies_once_each(tmp_path: Path):
+    from datetime import datetime, timezone
+
+    from src.followups import draft_followups
+
+    db = Database(tmp_path / "t.db")
+    now = datetime(2026, 11, 24, 12, tzinfo=timezone.utc)
+    for domain, stage, sent_on in (("due.dev", "sent", 14), ("older.dev", "sent", 10), ("recent.dev", "sent", 21),
+                                   ("replied.dev", "replied", 10), ("bounced.dev", "bounced", 10),
+                                   ("met.dev", "interview", 10), ("broken.dev", "sent", 12)):
+        _drafted(db, domain, f"d-{domain}")
+        db.set_stage(domain, "sent", "mailbox", datetime(2026, 11, sent_on, 9, tzinfo=timezone.utc).isoformat())
+        if stage != "sent":
+            db.set_stage(domain, stage, "mailbox")
+
+    # a dry run records nothing and creates no draft
+    gmail = _FakeDrafts(broken={"ada@broken.dev"})
+    preview = draft_followups(db, gmail, PROFILE, 7, 5, dry_run=True, now=now)
+    assert [f.domain for f in preview] == ["older.dev", "due.dev"] and gmail.created == []
+
+    # one per run here: the oldest first; a broken company is skipped, the next is still drafted
+    assert [f.domain for f in draft_followups(db, gmail, PROFILE, 7, 1, now=now)] == ["older.dev"]
+    done = draft_followups(db, gmail, PROFILE, 7, 5, now=now)
+    assert [f.domain for f in done] == ["due.dev"]
+    to, subject, body, reply_to = gmail.created[-1]
+    assert to == "ada@due.dev" and subject == "Re: Remote Backend/AI engineering internship - Due"
+    assert (reply_to.thread_id, reply_to.message_id) == ("thread-ada@due.dev", "<orig-ada@due.dev>")
+    assert "14 November" in body
+
+    assert draft_followups(db, gmail, PROFILE, 7, 5, now=now) == []      # exactly once each
+    assert draft_followups(db, gmail, PROFILE, 0, 5, now=now) == []      # 0 days: follow-ups off
+    rows = {r["domain"]: r["followed_up_at"] for r in db.drafted()}
+    assert rows["due.dev"] and rows["older.dev"] and not rows["broken.dev"] and not rows["recent.dev"]
+
+
+def test_gmail_follow_up_draft_joins_the_original_thread():
+    import base64
+    from email import message_from_bytes
+    from types import SimpleNamespace as NS
+
+    from src.outreach.gmail_client import SentMessage
+
+    created = {}
+
+    def create(userId, body):
+        created.update(body)
+        return NS(execute=lambda: {"id": "draft-9"})
+
+    listed = {"messages": [{"id": "new", "threadId": "t1"}, {"id": "orig", "threadId": "t1"}]}
+    got = {"orig": {"threadId": "t1", "payload": {"headers": [
+        {"name": "Message-ID", "value": "<abc@mail.gmail.com>"}, {"name": "Subject", "value": "Internship - Acme"}]}}}
+    client = gmail_client.GmailDraftClient(Path("c.json"), Path("t.json"))
+    client._service = NS(users=lambda: NS(
+        drafts=lambda: NS(create=create),
+        messages=lambda: NS(list=lambda **kw: NS(execute=lambda: listed),
+                            get=lambda id, **kw: NS(execute=lambda: got[id]))))
+
+    original = client.first_sent("ada@acme.com", "2026/11/13")
+    assert original == SentMessage("t1", "<abc@mail.gmail.com>", "Internship - Acme")  # the oldest one
+    assert client.create_draft("ada@acme.com", "Re: Internship - Acme", "Hi", reply_to=original) == "draft-9"
+    assert created["message"]["threadId"] == "t1"
+    msg = message_from_bytes(base64.urlsafe_b64decode(created["message"]["raw"]))
+    assert msg["In-Reply-To"] == msg["References"] == "<abc@mail.gmail.com>"
+    assert msg["Subject"] == "Re: Internship - Acme"

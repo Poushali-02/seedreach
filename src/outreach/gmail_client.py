@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.message import EmailMessage
 from email.utils import parseaddr, parsedate_to_datetime
@@ -55,12 +56,24 @@ def token_can_read(token_file: Path) -> bool:
     return READ_SCOPE in granted
 
 
-def build_raw_message(to: str, subject: str, body: str) -> str:
+def build_raw_message(to: str, subject: str, body: str, in_reply_to: str = "") -> str:
+    """`in_reply_to`: the Message-ID of the email this answers, so mail apps show it in that conversation."""
     msg = EmailMessage()
     msg["To"] = to
     msg["Subject"] = subject
+    if in_reply_to:
+        msg["In-Reply-To"] = in_reply_to
+        msg["References"] = in_reply_to
     msg.set_content(body, subtype="plain", charset="utf-8")
     return base64.urlsafe_b64encode(msg.as_bytes()).decode()
+
+
+@dataclass(frozen=True)
+class SentMessage:
+    """An email you sent, with what a reply needs to join its conversation."""
+    thread_id: str
+    message_id: str  # its Message-ID header, "" if Gmail didn't return one
+    subject: str
 
 
 def html_of(payload: dict) -> str:
@@ -139,12 +152,14 @@ class GmailDraftClient:
         """Trigger the OAuth flow now so failures surface before any LLM spend."""
         _ = self.service
 
-    def create_draft(self, to: str, subject: str, body: str) -> str:
-        """Save a draft and return its Gmail draft id."""
+    def create_draft(self, to: str, subject: str, body: str, reply_to: Optional[SentMessage] = None) -> str:
+        """Save a draft and return its Gmail draft id. With `reply_to`, the draft joins that email's thread:
+        Gmail needs the thread id on the message, In-Reply-To/References headers, and a matching subject."""
+        message = {"raw": build_raw_message(to, subject, body, reply_to.message_id if reply_to else "")}
+        if reply_to and reply_to.thread_id:
+            message["threadId"] = reply_to.thread_id
         try:
-            draft = self.service.users().drafts().create(
-                userId="me", body={"message": {"raw": build_raw_message(to, subject, body)}}
-            ).execute()
+            draft = self.service.users().drafts().create(userId="me", body={"message": message}).execute()
         except HttpError as exc:
             raise GmailError(f"Gmail API error: {exc}") from exc
         return draft["id"]
@@ -173,6 +188,23 @@ class GmailDraftClient:
         except HttpError as exc:
             raise GmailError(f"Gmail API error: {exc}") from exc
         return found
+
+    def first_sent(self, to: str, after: str) -> Optional[SentMessage]:
+        """The earliest email in Sent to `to` since `after` (YYYY/MM/DD), or None. Needs the read-only scope."""
+        try:
+            listed = self.service.users().messages().list(
+                userId="me", q=f"in:sent to:{to} after:{after}", maxResults=10).execute()
+            refs = listed.get("messages") or []
+            if not refs:
+                return None
+            ref = refs[-1]  # newest first, so the last is the original email
+            msg = self.service.users().messages().get(
+                userId="me", id=ref["id"], format="metadata", metadataHeaders=["Message-ID", "Subject"]).execute()
+        except HttpError as exc:
+            raise GmailError(f"Gmail API error: {exc}") from exc
+        headers = {h["name"].lower(): h["value"] for h in (msg.get("payload") or {}).get("headers") or []}
+        return SentMessage(msg.get("threadId") or ref.get("threadId") or "", headers.get("message-id", ""),
+                           headers.get("subject", ""))
 
     def message_dates(self, query: str, limit: int = 5) -> list[datetime]:
         """When each message matching a Gmail search was sent (UTC), newest first."""

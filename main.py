@@ -8,6 +8,7 @@
     python main.py track
     python main.py mark useshiplog.com interview
     python main.py export --csv tracker.csv
+    python main.py followups --dry-run
 
 Drafts are only ever saved to Gmail Drafts; nothing is sent automatically.
 """
@@ -34,6 +35,8 @@ from src.notify import build_summary, send_summary
 from src.outreach.gmail_client import GmailDraftClient, GmailError, token_can_read
 from src.pipeline import Pipeline, Result
 from src.trace import Trace
+from src.followups import FollowUp, draft_followups
+from src.profile import ProfileError, load_profile
 from src.tracker import Change, update_stages
 from src.utils import domain_of, linkedin_people_search, normalize_url
 
@@ -130,6 +133,7 @@ def run(
             console.print(f"  {a.company}: {a.role}{', ' + a.location if a.location else ''}  [dim]{a.apply_url}[/dim]")
     if not dry_run:
         _print_changes(pipe.track())
+        _print_followups(pipe.follow_up())
     if digest is not None:  # written even when empty, so a scheduler can tell "nothing new" from "didn't run"
         digest.write_text(build_digest(results, dry_run=dry_run, alerts=alerts), encoding="utf-8")
     counts = _summary(results, dry_run)
@@ -276,8 +280,54 @@ def mark(
     console.print(f"{name}: [bold]{stage.lower()}[/bold]")
 
 
+def _print_followups(done: list[FollowUp], dry_run: bool = False) -> None:
+    if not done:
+        return
+    verb = "would be drafted" if dry_run else "drafted (review them in Gmail > Drafts)"
+    console.print(f"\n[bold]{len(done)} follow-up{'s' if len(done) != 1 else ''}[/bold] {verb}: "
+                  + ", ".join(escape(f.company) for f in done))
+    if dry_run:
+        for f in done:
+            console.print(Panel(escape(f.draft.body), title=escape(f"Subject: {f.draft.subject}"), expand=False))
+
+
+@app.command()
+def followups(
+    after_days: Optional[int] = typer.Option(None, "--after-days", help="Follow up on emails sent at least this "
+                                             "many days ago (default: FOLLOW_UP_AFTER_DAYS, 7)."),
+    limit: Optional[int] = typer.Option(None, "--limit", "-n", help="At most this many (default: "
+                                        "FOLLOW_UPS_PER_RUN, 5)."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print the follow-ups; create no drafts, record nothing."),
+) -> None:
+    """Draft one short follow-up, in the same Gmail conversation, for companies that haven't replied."""
+    settings = get_settings()
+    if not (settings.job_alerts or token_can_read(settings.google_token_file)):
+        console.print("[yellow]Follow-ups need to know which emails you sent, which needs Gmail read access. "
+                      "Run once with JOB_ALERTS=1 to sign in with it, then `python main.py track`.[/yellow]")
+        raise typer.Exit(1)
+    try:
+        profile = load_profile()
+    except ProfileError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(2)
+    gmail = GmailDraftClient(settings.google_credentials_file, settings.google_token_file, settings.headless,
+                             read_mail=True)
+    try:
+        gmail.ensure_authenticated()
+    except GmailError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+    days = settings.follow_up_after_days if after_days is None else after_days
+    done = draft_followups(_db(), gmail, profile, days, settings.follow_ups_per_run if limit is None else limit,
+                           dry_run=dry_run)
+    _print_followups(done, dry_run)
+    if not done:
+        console.print(f"No follow-ups due: nobody emailed {days}+ days ago is waiting without one. "
+                      "(Run `python main.py track` first so recent sends and replies are known.)")
+
+
 EXPORT_COLUMNS = ("domain", "company_name", "founder_name", "founder_email", "email_source", "stage", "stage_source",
-                  "drafted_at", "sent_at", "replied_at", "stage_at")
+                  "drafted_at", "sent_at", "replied_at", "stage_at", "followed_up_at")
 
 
 @app.command()

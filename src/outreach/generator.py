@@ -1,14 +1,16 @@
-"""Draft a plain-text cold email whose project matches the company's domain.
+"""Draft a plain-text cold email whose project matches the company's domain, and its one follow-up.
 
 Two styles, chosen by `email_style` in profile.json:
   short (default)  greeting, the opener, who you are, one project, one ask, two links: ~100-130 words
   long             every section: role pitch, all matching projects, experience, stack, closing, all links
+A follow-up (`generate_followup`) is always short: a reminder, the same ask, the resume.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 from src.intelligence.extractor import CompanyProfile
@@ -90,6 +92,29 @@ def _long(company: CompanyProfile, profile: Profile, name: str, greeting: str, r
         "\n".join(_links(profile, 3)),
         f"Best,\n{signature}",
     ]
+
+
+def generate_followup(company_name: str, founder_name: Optional[str], profile: Profile, sent_at: datetime,
+                      subject: str = "") -> EmailDraft:
+    """A short nudge, once, about a week after your first email: same ask, the resume, nothing else.
+
+    `subject` is the first email's subject as it was sent; the reply keeps it ("Re: ...") so Gmail threads it.
+    """
+    name = display_name(company_name)
+    first = strip_markdown(founder_name).split()[0] if founder_name and strip_markdown(founder_name) else ""
+    ask = (profile.ask or DEFAULT_ASK).replace("{company}", name)
+    sections = [
+        f"Hi {first}," if first else f"Hi {name} team,",
+        f"Following up on my email from {sent_at.day} {sent_at:%B}, in case it got buried. {ask}",
+        "\n".join(_links(profile, 0)),
+        f"Thanks,\n{profile.name}",
+    ]
+    body = "\n\n".join(s for s in sections if s) + "\n"
+    original = subject or profile.subject.replace("{company}", name)
+    reply_subject = original if re.match(r"\s*re\s*:", original, re.I) else f"Re: {original}"
+    _assert_plain_text(body)
+    _assert_plain_text(reply_subject)
+    return EmailDraft(subject=reply_subject, body=body)
 
 
 def generate_email(company: CompanyProfile, profile: Profile, role: Optional[str] = None) -> EmailDraft:

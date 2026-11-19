@@ -16,6 +16,10 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   Reading Sent and the inbox uses Gmail's read-only permission only if your token already has it, so it
   never asks you to sign in again; `TRACK_MAILBOX=0` turns it off. Existing databases are upgraded in
   place when opened.
+- Follow-up drafts (#17). A week after you send an email with no reply, seedreach drafts one short
+  follow-up in the same Gmail conversation: a reminder, your ask and your resume. Once per company, at
+  most 5 per run (`FOLLOW_UP_AFTER_DAYS`, `FOLLOW_UPS_PER_RUN`), never after a reply, a bounce or a stage
+  you set yourself, and never sent. `python main.py followups --dry-run` previews them.
 
 ### Fixed
 - One bad lead no longer stops a run. An unexpected error in one company is recorded as an error for

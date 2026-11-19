@@ -153,6 +153,7 @@ python main.py status
 python main.py track
 python main.py mark example-startup.com interview   # stages the mailbox can't see: interview, offer, closed
 python main.py export --csv tracker.csv              # every draft and its stage, for a spreadsheet
+python main.py followups --dry-run                   # preview the follow-ups due (every real `run` drafts them too)
 ```
 
 Then open Gmail > Drafts, review each draft, and send the ones you like yourself.
@@ -181,6 +182,31 @@ each company it drafted to and records where it stands:
 - `export --csv` writes every draft with its stage and dates. The file holds email addresses, so keep it
   out of git.
 - `TRACK_MAILBOX=0` turns the tracker off.
+
+### Follow-ups
+
+A week after you send an email with no reply, seedreach drafts one short follow-up in the **same Gmail
+conversation**, so the founder sees it under your first email:
+
+```text
+Re: Remote Backend/AI engineering internship - Acme
+
+Hi Ada,
+
+Following up on my email from 14 November, in case it got buried. <your ask from profile.json>
+
+Resume: https://...
+
+Thanks,
+Your Name
+```
+
+- **Only for the tracker's `sent` stage**: a reply, a bounce, or a stage you set with `mark` (interview,
+  closed...) means no follow-up. So it needs the tracker's read access.
+- **Once per company**, oldest first, at most `FOLLOW_UPS_PER_RUN` (5) per run, after `FOLLOW_UP_AFTER_DAYS`
+  (7) days. `FOLLOW_UP_AFTER_DAYS=0` turns follow-ups off.
+- It's a draft like everything else: read it, edit it, and send it yourself, or delete it.
+- `python main.py followups --dry-run` shows what would be drafted; `followups` drafts them now.
 
 ## How it works
 
