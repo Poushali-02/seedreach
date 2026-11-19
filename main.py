@@ -402,9 +402,9 @@ def status(events: int = typer.Option(10, "--events", "-e", help="How many recen
             table.add_column(col)
         for row in alerts:
             table.add_row(
-                row["company"],
-                row["role"],
-                row["location"] or "-",
+                escape(row["company"]),
+                escape(row["role"]),
+                escape(row["location"] or "-"),
                 row["portal"],
                 row["first_seen"][:10],
             )

@@ -1869,3 +1869,50 @@ def test_status_shows_job_alerts_only_when_present(tmp_path, monkeypatch):
     assert "From your job alerts" in result.output
     assert "Example Labs" in result.output
     assert "Python Intern" in result.output
+
+
+def test_status_preserves_brackets_in_job_alerts(tmp_path, monkeypatch):
+    from rich.console import Console
+    from typer.testing import CliRunner
+
+    import main
+    from src.db import Database
+
+    db = Database(tmp_path / "test.db")
+    monkeypatch.setattr(main, "_db", lambda: db)
+    monkeypatch.setattr(main, "console", Console(width=200, color_system=None))
+
+    db.add_alert_job(
+        "LinkedIn",
+        "Example [Labs]",
+        "Intern [Summer 2027] [/b]",
+        "https://example.com/brackets",
+        "Remote [EU]",
+    )
+
+    result = CliRunner().invoke(main.app, ["status"])
+
+    assert result.exit_code == 0, result.output
+    assert "Example [Labs]" in result.output
+    assert "Intern [Summer 2027] [/b]" in result.output
+    assert "Remote [EU]" in result.output
+
+
+def test_recent_alert_jobs_orders_equal_timestamps(tmp_path, monkeypatch):
+    from src.db import Database
+
+    monkeypatch.setattr("src.db._now", lambda: "2026-11-19T10:00:00+00:00")
+    db = Database(tmp_path / "test.db")
+
+    db.add_alert_job(
+        "LinkedIn", "First Labs", "Java Intern", "https://example.com/first"
+    )
+    db.add_alert_job(
+        "LinkedIn", "Second Labs", "Python Intern", "https://example.com/second"
+    )
+
+    rows = db.recent_alert_jobs(2)
+    assert [row["company"] for row in rows] == ["Second Labs", "First Labs"]
+
+    limited_rows = db.recent_alert_jobs(1)
+    assert [row["company"] for row in limited_rows] == ["Second Labs"]
