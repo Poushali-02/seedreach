@@ -344,7 +344,7 @@ def export(csv: Path = typer.Option(..., "--csv", help="Where to write the CSV (
 
 @app.command()
 def status(events: int = typer.Option(10, "--events", "-e", help="How many recent log events to show.")) -> None:
-    """Show totals, the tracker, recent drafts, recent runs and the event log."""
+    """Show totals, the tracker, recent drafts, job alerts, recent runs and the event log."""
     db = _db()
     s = db.stats()
     console.print(
