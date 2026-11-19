@@ -3,7 +3,8 @@
 HARD CONSTRAINT: there is intentionally no code path calling drafts().send() or messages().send().
 
 With JOB_ALERTS=1 it also reads job-alert emails (see src/sourcing/job_alerts.py). That needs Gmail's
-read-only scope on top of the draft scope, so it is asked for only when the setting is on.
+read-only scope on top of the draft scope, so it is asked for only when the setting is on. The tracker
+(src/tracker.py) reads too, but only with a token that already has that scope: it never asks for it.
 """
 
 from __future__ import annotations
@@ -11,8 +12,9 @@ from __future__ import annotations
 import base64
 import json
 import logging
+from datetime import datetime, timezone
 from email.message import EmailMessage
-from email.utils import parseaddr
+from email.utils import parseaddr, parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -33,6 +35,15 @@ READ_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"  # only with JOB_A
 
 class GmailError(Exception):
     """Authentication, draft creation or reading mail failed."""
+
+
+def token_can_read(token_file: Path) -> bool:
+    """Whether the saved token already has read access, so the tracker can read mail without a new sign-in."""
+    try:
+        granted = json.loads(token_file.read_text(encoding="utf-8")).get("scopes") or []
+    except (OSError, ValueError):
+        return False
+    return READ_SCOPE in granted
 
 
 def build_raw_message(to: str, subject: str, body: str) -> str:
@@ -128,6 +139,37 @@ class GmailDraftClient:
         except HttpError as exc:
             raise GmailError(f"Gmail API error: {exc}") from exc
         return draft["id"]
+
+    def draft_exists(self, draft_id: str) -> bool:
+        """Whether a draft is still in Drafts. Gmail deletes a draft once it's sent (or discarded), so a missing
+        draft is the first sign it went out. Needs only the draft scope."""
+        try:
+            self.service.users().drafts().get(userId="me", id=draft_id, format="minimal").execute()
+            return True
+        except HttpError as exc:
+            if exc.resp.status == 404:
+                return False
+            raise GmailError(f"Gmail API error: {exc}") from exc
+
+    def message_dates(self, query: str, limit: int = 5) -> list[datetime]:
+        """When each message matching a Gmail search was sent (UTC), newest first. Reads headers only, and
+        leaves Spam and Trash out. Needs the read-only scope."""
+        try:
+            listed = self.service.users().messages().list(userId="me", q=query, maxResults=limit).execute()
+            dates: list[datetime] = []
+            for ref in listed.get("messages") or []:
+                msg = self.service.users().messages().get(
+                    userId="me", id=ref["id"], format="metadata", metadataHeaders=["Date"]).execute()
+                header = next((h["value"] for h in (msg.get("payload") or {}).get("headers") or []
+                               if h["name"].lower() == "date"), "")
+                try:
+                    when = parsedate_to_datetime(header)
+                except (TypeError, ValueError):
+                    continue
+                dates.append((when if when.tzinfo else when.replace(tzinfo=timezone.utc)).astimezone(timezone.utc))
+        except HttpError as exc:
+            raise GmailError(f"Gmail API error: {exc}") from exc
+        return dates
 
     def messages(self, query: str, limit: int = 30) -> list[AlertMessage]:
         """Emails matching a Gmail search, newest first: sender and HTML body only. Read-only.

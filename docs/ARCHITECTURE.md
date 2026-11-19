@@ -54,7 +54,12 @@ python main.py run --limit 5
    (`src/sourcing/job_alerts.py`, one parser per sender; Gmail read-only scope). New internships go into
    the digest with their apply links and are remembered in the `alert_jobs` table so each is listed
    once. They don't enter the pipeline above: an alert names a company, not its website.
-5. **After the run**, `run --digest FILE` writes the digest (`src/digest.py`): roles to apply for,
+5. **The tracker** (`src/tracker.py`, unless `TRACK_MAILBOX=0`) checks every drafted company still in
+   play: a draft that left Drafts was sent or deleted; with Gmail read access (only if the token already
+   has it), a message in Sent to that address marks it `sent`, then a message from it `replied` and a
+   delivery failure naming it `bounced`. Stages set with `mark` (interview, offer, closed) are never
+   changed. `track` runs the same check on its own.
+6. **After the run**, `run --digest FILE` writes the digest (`src/digest.py`): roles to apply for,
    founders to reach on LinkedIn and drafts to review, with no email addresses; the scheduled-runs
    template posts it as a GitHub issue comment. If Telegram or Discord is configured, a one-line summary
    is sent too (`src/notify.py`).
@@ -70,11 +75,17 @@ python main.py run --limit 5
 
 `--dry-run` prints drafts and records nothing.
 
+A drafted company also has a **stage** (columns `stage`, `stage_source`, `stage_at`, `sent_at`,
+`replied_at`): empty while the draft is in Drafts, then `sent`, `replied` or `bounced` from the mailbox,
+`draft gone` when the draft left Drafts with no sent copy found, or `interview`/`offer`/`closed` set with
+`mark`. Schema changes to existing tables go in `MIGRATIONS` in `src/db.py`, counted by
+`PRAGMA user_version`, so older databases (the runner's included) catch up when opened.
+
 ## Where things live
 
 | Path | Responsibility |
 |---|---|
-| `main.py` | Typer CLI: `run`, `target`, `add-target`, `status` |
+| `main.py` | Typer CLI: `run`, `target`, `add-target`, `status`, `track`, `mark`, `export` |
 | `src/config.py` | Settings from `.env` (Pydantic `BaseSettings`) |
 | `src/profile.py` | Loads and validates `profile.json` (your details) |
 | `src/db.py` | SQLite: companies, statuses, event log, dedupe, run traces |
@@ -82,10 +93,11 @@ python main.py run --limit 5
 | `src/pipeline.py` | Orchestration, source registry (`build_providers`), `interleave` |
 | `src/digest.py` | The run digest (`run --digest`): roles to apply for, founders to reach, drafts to review |
 | `src/notify.py` | The optional one-line run summary to Telegram or Discord |
+| `src/tracker.py` | Where each drafted company stands after the draft (sent, replied, bounced), read from the mailbox |
 | `src/sourcing/` | Lead sources: one module per source |
 | `src/intelligence/` | `scraper.py` (HTML to text) and `extractor.py` (LLM to `CompanyProfile`) |
 | `src/enrichment/` | `email_finder.py`, `job_boards.py` (open internships on public job boards) and `company_facts.py` (company size from Apollo) |
-| `src/outreach/` | `generator.py` (email text) and `gmail_client.py` (creates drafts, never sends; reads job-alert emails only with `JOB_ALERTS=1`) |
+| `src/outreach/` | `generator.py` (email text) and `gmail_client.py` (creates drafts, never sends; reads job-alert emails only with `JOB_ALERTS=1`, and message dates for the tracker only if the token already allows reading) |
 | `tests/test_core.py`, `tests/test_job_boards.py` | Tests; every network and LLM call is faked (job-board fixtures are recorded real responses) |
 
 ## Adding a lead source
