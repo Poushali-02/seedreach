@@ -1,0 +1,64 @@
+src/outreach/gmail_client.py
+  s_a585a42396af9c::t_320d4ef8ee0adb 40-48
+  s_a585a42396af9c::t_58c80e496e20b6 163-165,168,171-172,175-180
+src/tracker.py
+  s_a585a42396af9c::t_3f40b7b219e8b9 6-10,32
+  s_a585a42396af9c::t_ae60d1ac5631cf 20,23,27,37-41,45-51,53-54
+  s_a585a42396af9c::t_711ba972bca939 31
+  s_a585a42396af9c::t_ffd646ca134947 42-44
+  s_a585a42396af9c::t_4298ddeb7ef600 52
+  s_a585a42396af9c::t_3f59465e28bf46 114-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "1b901ec52acc3a972db7b1ea95379b47c65709fe",
+  "branch": "fix/tracker-replies",
+  "prompts": {
+    "s_a585a42396af9c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "134ea384-0435-4a15-8db8-3572e5fc3a2b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:8aa12f18bf4e046f74b4becb79045d84d8580b86dfff19f6f245660ad0ff75f2",
+      "total_additions": 56,
+      "total_deletions": 19,
+      "accepted_lines": 52,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_a585a42396af9c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "134ea384-0435-4a15-8db8-3572e5fc3a2b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:8aa12f18bf4e046f74b4becb79045d84d8580b86dfff19f6f245660ad0ff75f2",
+      "stats": {
+        "total_additions": 56,
+        "total_deletions": 19,
+        "accepted_lines": 52,
+        "overriden_lines": 0,
+        "files": {
+          "src/outreach/gmail_client.py": {
+            "total_additions": 21,
+            "total_deletions": 13,
+            "accepted_lines": 21,
+            "overriden_lines": 0
+          },
+          "src/tracker.py": {
+            "total_additions": 35,
+            "total_deletions": 6,
+            "accepted_lines": 31,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  },
+  "integrity": {"v":1,"commit":"1b901ec52acc3a972db7b1ea95379b47c65709fe","tree":"9caaded8f9cc107c6690201f673a25d3bdce9289","files":{"src/outreach/gmail_client.py":"1d69d8db81ee8eb8d44989833c2b403c7b26ca56","src/tracker.py":"74632daa941f17c12c7c801ffadcce72a1ec74c2"},"digest":"90e879306b6bfa34e18cfe1bd1f6828f642b22d3e43f8afede598e717a705e70"}
+}
