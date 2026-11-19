@@ -1,0 +1,114 @@
+CHANGELOG.md
+  s_a585a42396af9c::t_1d4c1c8f26eff0 19-22
+main.py
+  s_a585a42396af9c::t_8d72b535cbcc2f 38-39
+  s_a585a42396af9c::t_64be6869fc764a 136
+src/config.py
+  s_a585a42396af9c::t_a76fdd885e86ae 79-82
+src/db.py
+  s_a585a42396af9c::t_17564a3442ee72 81-85
+  s_a585a42396af9c::t_c7162e4746dea4 325-343
+src/followups.py
+  s_a585a42396af9c::t_93491b88f3f627 1-60
+src/outreach/generator.py
+  s_a585a42396af9c::t_70da7261799ef0 1,6
+  s_a585a42396af9c::t_13f01d9bab1fa8 13
+  s_a585a42396af9c::t_a6ddb55b4b2799 97-119
+src/outreach/gmail_client.py
+  s_a585a42396af9c::t_a3bd1129609358 15
+  s_a585a42396af9c::t_047bd0168e11af 59-60,64-66,71-78
+  s_a585a42396af9c::t_3b45d2b00142cc 155-160,162
+  s_a585a42396af9c::t_084264d34c2f96 192-208
+src/pipeline.py
+  s_a585a42396af9c::t_97e94ac2969943 30
+  s_a585a42396af9c::t_a083dedbf2a02b 320-326
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "27bcaaef8e095efdb23e5067879533cfeaab33cc",
+  "branch": "feat/followups",
+  "prompts": {
+    "s_a585a42396af9c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "134ea384-0435-4a15-8db8-3572e5fc3a2b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:bb2a157dbe00b836e2817f2220e1e74c4b776dd1a8b61626d7e1a27b5c244e7d",
+      "total_additions": 214,
+      "total_deletions": 9,
+      "accepted_lines": 167,
+      "overriden_lines": 57
+    }
+  },
+  "sessions": {
+    "s_a585a42396af9c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "134ea384-0435-4a15-8db8-3572e5fc3a2b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:bb2a157dbe00b836e2817f2220e1e74c4b776dd1a8b61626d7e1a27b5c244e7d",
+      "stats": {
+        "total_additions": 214,
+        "total_deletions": 9,
+        "accepted_lines": 167,
+        "overriden_lines": 57,
+        "files": {
+          "CHANGELOG.md": {
+            "total_additions": 4,
+            "total_deletions": 0,
+            "accepted_lines": 4,
+            "overriden_lines": 0
+          },
+          "main.py": {
+            "total_additions": 50,
+            "total_deletions": 1,
+            "accepted_lines": 3,
+            "overriden_lines": 57
+          },
+          "src/config.py": {
+            "total_additions": 4,
+            "total_deletions": 0,
+            "accepted_lines": 4,
+            "overriden_lines": 0
+          },
+          "src/db.py": {
+            "total_additions": 24,
+            "total_deletions": 1,
+            "accepted_lines": 24,
+            "overriden_lines": 0
+          },
+          "src/followups.py": {
+            "total_additions": 60,
+            "total_deletions": 0,
+            "accepted_lines": 60,
+            "overriden_lines": 0
+          },
+          "src/outreach/generator.py": {
+            "total_additions": 26,
+            "total_deletions": 1,
+            "accepted_lines": 26,
+            "overriden_lines": 0
+          },
+          "src/outreach/gmail_client.py": {
+            "total_additions": 38,
+            "total_deletions": 6,
+            "accepted_lines": 38,
+            "overriden_lines": 0
+          },
+          "src/pipeline.py": {
+            "total_additions": 8,
+            "total_deletions": 0,
+            "accepted_lines": 8,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  },
+  "integrity": {"v":1,"commit":"27bcaaef8e095efdb23e5067879533cfeaab33cc","tree":"a2df501e9269b8155082057159261e27f326008f","files":{"CHANGELOG.md":"8ed5cb324004451baef3e14cb893cdbe3cff2003","main.py":"e9fe6b5083e1e158c3e226627e7a0f5a15b58756","src/config.py":"7497dde49d258e145cfc42ccb6cc6f19fb38108a","src/db.py":"23f8444ffab28379353d4b890c6af211acddbdce","src/followups.py":"94fb041c351672aedf7773ccb3f824ee8e33ea85","src/outreach/generator.py":"20995999a144db43df649240ca3b0f81535574b4","src/outreach/gmail_client.py":"1e627190bb2e4a8b4401e4127f8e6e91e80ff656","src/pipeline.py":"0171afd49d82f109469231da62c1e48d341cca05"},"digest":"21b4810395cc2d715d8a8aade02d2e7829b965071aee0708fa1ce7e8c0e83c17"}
+}
