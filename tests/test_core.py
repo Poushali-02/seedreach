@@ -1409,6 +1409,13 @@ def test_summary_lists_company_names_only():
     from src.pipeline import Result
 
     text = build_summary(_summary_results())
+    alert_text = build_summary(_summary_results(), alert_count=2)
+    assert alert_text == (
+        "seedreach: 2 new drafts: HillStar, alter.dev · 2 skipped "
+        "· 2 new from job alerts · 1 error"
+    )
+    assert "@" not in alert_text
+    assert "https://" not in alert_text
     assert text == "seedreach: 2 new drafts: HillStar, alter.dev · 2 skipped · 1 error"
     assert "@" not in text  # skip and error reasons can hold addresses: never included
     assert build_summary([Result("a.dev", "skipped", "x")]) == "seedreach: no new drafts · 1 skipped"

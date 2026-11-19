@@ -349,9 +349,10 @@ internships with apply links, founders to reach on LinkedIn (when only a generic
 found) and drafts to review. It has company names and links only, never email addresses. Nothing to report
 means no comment.
 
-For a one-line summary on Telegram or Discord as well ("3 new drafts: HillStar, Alter · 2 skipped"), add
-the secrets `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, and/or `DISCORD_WEBHOOK_URL`. It lists company
-names and counts only, never founder addresses or draft text. It's sent after real runs, not dry runs.
+For a one-line summary on Telegram or Discord as well ("3 new drafts: HillStar, Alter · 2 skipped · 4 new
+from job alerts"), add the secrets `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, and/or `DISCORD_WEBHOOK_URL`.
+It lists company names and counts only, including the count of new job-alert openings when there are any;
+it never includes email addresses, apply links or draft text. It's sent after real runs, not dry runs.
 
 - **Telegram**: message [@BotFather](https://t.me/BotFather), send `/newbot` and follow the prompts; it
   replies with the bot token. Send any message to your new bot, then open

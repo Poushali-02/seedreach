@@ -5,6 +5,10 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+### Added
+- Telegram and Discord run summaries now include the count of new job-alert openings when there are any.
+  The summary contains no email addresses or apply links.
+
 ## [0.7.0] - 2026-11-19
 
 Fewer wasted drafts: big companies are skipped, LinkedIn job emails are read, and targets can come from a CSV.
