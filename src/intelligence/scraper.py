@@ -155,6 +155,12 @@ class Scraper:
         raise ScrapeError(f"Could not fetch {url}: {last}")
 
     def fetch(self, url: str) -> ScrapedPage:
+        try:
+            return self._fetch(url)
+        except ValueError as exc:  # e.g. a redirect to a host with no dot ("http://intranet/")
+            raise ScrapeError(f"{url}: {exc}") from exc
+
+    def _fetch(self, url: str) -> ScrapedPage:
         url = normalize_url(url)
         html, final_url = self._get_html(url)
         page, extra_links = _parse(html, final_url)

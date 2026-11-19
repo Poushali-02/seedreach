@@ -114,6 +114,9 @@ def test_profile_validation(tmp_path: Path):
     bad.write_text(json.dumps({**good, "email_style": "medium"}), encoding="utf-8")
     with pytest.raises(ProfileError, match="email_style"):
         load_profile(bad)
+    bad.write_text(json.dumps({**good, "projects": {**good["projects"], "Other": []}}), encoding="utf-8")
+    with pytest.raises(ProfileError, match="empty: Other"):
+        load_profile(bad)
 
 
 # ---- email finder -----------------------------------------------------
@@ -887,6 +890,42 @@ def _traced_pipeline(tmp_path: Path, founder_text: str):
     pipe.company_facts = NS(enabled=False, lookup=lambda domain: None)  # no Apollo key
     return pipe
 
+
+
+def test_scraper_turns_a_redirect_to_a_bad_host_into_a_scrape_error():
+    import httpx
+
+    from src.intelligence.scraper import ScrapeError, Scraper
+
+    def handler(request):
+        if request.url.host == "acme.com":
+            return httpx.Response(302, headers={"location": "http://intranet/"})
+        return httpx.Response(200, html="<html><body>internal page</body></html>")
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    with pytest.raises(ScrapeError, match="intranet"):
+        Scraper(Settings(), client=client).fetch("https://acme.com")
+
+
+def test_one_unexpected_error_does_not_stop_the_run(tmp_path: Path):
+    from src.intelligence.scraper import ScrapedPage
+
+    pipe = _traced_pipeline(tmp_path, "Shiplog was started by Ada.")
+
+    def fetch(url):
+        if "broken" in url:
+            raise RuntimeError("boom")
+        return ScrapedPage(url=url, domain="useshiplog.com", text="Shiplog was started by Ada.", pages=[url])
+
+    pipe.scraper.fetch = fetch
+    pipe.db.queue("broken.dev", "https://broken.dev", "manual")
+    pipe.db.queue("useshiplog.com", "https://useshiplog.com", "manual")
+    results = pipe.run(limit=1, source="all")
+
+    assert [(r.domain, r.outcome) for r in results] == [("broken.dev", "error"), ("useshiplog.com", "drafted")]
+    assert "RuntimeError: boom" in results[0].detail
+    assert any(e["level"] == "ERROR" and e["domain"] == "broken.dev" for e in pipe.db.recent_events(5))
+    assert pipe.db.status_of("broken.dev") == "queued"  # an error is retried next run, never skipped
 
 def test_pipeline_records_a_trace_per_company(tmp_path: Path):
     pipe = _traced_pipeline(tmp_path, "Shiplog was started by Ada.")  # first name only on the page

@@ -80,6 +80,9 @@ def load_profile(path: Path = PROFILE_PATH) -> Profile:
     if not isinstance(projects, dict) or "Other" not in projects:
         raise ProfileError('"projects" must be an object that includes an "Other" fallback entry.')
     data["projects"] = {k: [v] if isinstance(v, str) else list(v) for k, v in projects.items()}
+    empty = [k for k, v in data["projects"].items() if not any(str(p).strip() for p in v)]
+    if empty:  # every draft quotes a project paragraph, so an empty entry would fail every draft
+        raise ProfileError(f'"projects" entries need at least one paragraph; empty: {", ".join(empty)}.')
     keywords = data.get("keywords", {})
     if not isinstance(keywords, dict) or set(keywords) - set(data["projects"]):
         raise ProfileError('Every topic under "keywords" needs an entry of the same name under "projects".')
