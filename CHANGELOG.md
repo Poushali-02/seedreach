@@ -10,7 +10,8 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   The summary contains no email addresses or apply links.
 - An application tracker (#18). After every real run, and with `python main.py track`, seedreach checks your
   mailbox for each draft: still in Drafts, `sent` (a copy in Sent), `replied`, `bounced`, or `draft gone`
-  (deleted, or no read access). `mark <domain> <stage>` sets stages the mailbox can't see (interview, offer,
+  (deleted, or no read access). Only a person's answer counts as a reply: a "Re:" message
+  from the company's domain, not an auto-reply or a newsletter. `mark <domain> <stage>` sets stages the mailbox can't see (interview, offer,
   closed), `status` shows the counts and who replied, and `export --csv` writes it all for a spreadsheet.
   Reading Sent and the inbox uses Gmail's read-only permission only if your token already has it, so it
   never asks you to sign in again; `TRACK_MAILBOX=0` turns it off. Existing databases are upgraded in

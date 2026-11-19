@@ -37,6 +37,15 @@ class GmailError(Exception):
     """Authentication, draft creation or reading mail failed."""
 
 
+def header_date(value: str) -> Optional[datetime]:
+    """A Date header as a UTC datetime, or None if it can't be read."""
+    try:
+        when = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    return (when if when.tzinfo else when.replace(tzinfo=timezone.utc)).astimezone(timezone.utc)
+
+
 def token_can_read(token_file: Path) -> bool:
     """Whether the saved token already has read access, so the tracker can read mail without a new sign-in."""
     try:
@@ -151,25 +160,24 @@ class GmailDraftClient:
                 return False
             raise GmailError(f"Gmail API error: {exc}") from exc
 
-    def message_dates(self, query: str, limit: int = 5) -> list[datetime]:
-        """When each message matching a Gmail search was sent (UTC), newest first. Reads headers only, and
-        leaves Spam and Trash out. Needs the read-only scope."""
+    def message_headers(self, query: str, names: list[str], limit: int = 5) -> list[dict[str, str]]:
+        """The named headers (keys lower-cased) of each message matching a Gmail search, newest first. Never
+        reads message bodies, and leaves Spam and Trash out. Needs the read-only scope."""
         try:
             listed = self.service.users().messages().list(userId="me", q=query, maxResults=limit).execute()
-            dates: list[datetime] = []
+            found: list[dict[str, str]] = []
             for ref in listed.get("messages") or []:
                 msg = self.service.users().messages().get(
-                    userId="me", id=ref["id"], format="metadata", metadataHeaders=["Date"]).execute()
-                header = next((h["value"] for h in (msg.get("payload") or {}).get("headers") or []
-                               if h["name"].lower() == "date"), "")
-                try:
-                    when = parsedate_to_datetime(header)
-                except (TypeError, ValueError):
-                    continue
-                dates.append((when if when.tzinfo else when.replace(tzinfo=timezone.utc)).astimezone(timezone.utc))
+                    userId="me", id=ref["id"], format="metadata", metadataHeaders=names).execute()
+                found.append({h["name"].lower(): h["value"] for h in (msg.get("payload") or {}).get("headers") or []})
         except HttpError as exc:
             raise GmailError(f"Gmail API error: {exc}") from exc
-        return dates
+        return found
+
+    def message_dates(self, query: str, limit: int = 5) -> list[datetime]:
+        """When each message matching a Gmail search was sent (UTC), newest first."""
+        dates = (header_date(h.get("date", "")) for h in self.message_headers(query, ["Date"], limit))
+        return [d for d in dates if d is not None]
 
     def messages(self, query: str, limit: int = 30) -> list[AlertMessage]:
         """Emails matching a Gmail search, newest first: sender and HTML body only. Read-only.

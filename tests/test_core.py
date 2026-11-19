@@ -1550,7 +1550,7 @@ class _FakeMailbox:
 
     def __init__(self, drafts=(), sent=None, replies=None, bounces=None, broken=()):
         self.drafts, self.broken = set(drafts), set(broken)
-        self.sent, self.replies, self.bounces = sent or {}, replies or {}, bounces or {}
+        self.sent, self.replies, self.bounces = sent or {}, replies or {}, bounces or {}  # replies: domain -> headers
 
     def draft_exists(self, draft_id):
         if draft_id in self.broken:
@@ -1560,9 +1560,15 @@ class _FakeMailbox:
     def message_dates(self, query, limit=5):
         if query.startswith("in:sent to:"):
             return self.sent.get(query.split()[1][len("to:"):], [])
-        if query.startswith("from:mailer-daemon"):
-            return self.bounces.get(query.split('"')[1], [])
+        return self.bounces.get(query.split('"')[1], [])  # from:mailer-daemon "<address>"
+
+    def message_headers(self, query, names, limit=5):
         return self.replies.get(query.split()[0][len("from:"):], [])
+
+
+def _reply(sender, subject="Re: Remote Backend/AI engineering internship", date="Sat, 21 Nov 2026 09:00:00 +0000",
+           **extra):
+    return {"from": sender, "subject": subject, "date": date, **extra}
 
 
 def _drafted(db, domain, draft_id):
@@ -1609,7 +1615,7 @@ def test_tracker_follows_each_draft_through_the_mailbox(tmp_path: Path):
 
     box = _FakeMailbox(drafts={"d1"}, broken={"d6"},
                        sent={"ada@sent.dev": [late, early], "ada@bounce.dev": [early]},
-                       replies={"ada@sent.dev": [late], "ada@met.dev": [late]},
+                       replies={"sent.dev": [_reply("Ada <ada@sent.dev>")], "met.dev": [_reply("ada@met.dev")]},
                        bounces={"ada@bounce.dev": [late]})
     changes = update_stages(db, box, can_read=True)
     assert {(c.domain, c.stage) for c in changes} == {("sent.dev", "sent"), ("bounce.dev", "sent")}
@@ -1701,3 +1707,22 @@ def test_token_can_read(tmp_path: Path):
     assert gmail_client.token_can_read(token) is False
     token.write_text(json.dumps({"scopes": gmail_client.SCOPES + [gmail_client.READ_SCOPE]}), encoding="utf-8")
     assert gmail_client.token_can_read(token) is True
+
+
+
+def test_only_a_persons_reply_counts():
+    from src.tracker import is_human_reply
+
+    # what a real inbox held for four "replies" (19 Nov): only the first is a person answering
+    assert is_human_reply(_reply("Ada <ada@acme.com>"), "acme.com")
+    assert is_human_reply(_reply("Bob <bob@acme.com>"), "acme.com")       # a colleague answered for the founder
+    assert is_human_reply(_reply("ada@mail.acme.com"), "acme.com")         # a subdomain of the company
+    assert not is_human_reply(_reply("ada@acme.com", **{"auto-submitted": "auto-replied"}), "acme.com")
+    assert not is_human_reply(_reply("ada@acme.com", subject="Support Request Received"), "acme.com")
+    assert not is_human_reply(_reply("news@acme.com", subject="Put Acme to work in your product"), "acme.com")
+    # a founder who sends through a mailing service: List-Unsubscribe on a real reply
+    assert is_human_reply(_reply("ada@acme.com", **{"list-unsubscribe": "<https://unsub.example>"}), "acme.com")
+    assert not is_human_reply(_reply("ada@acme.com", precedence="bulk"), "acme.com")
+    assert not is_human_reply(_reply("ada@acme.com", **{"x-autoreply": "yes"}), "acme.com")
+    assert not is_human_reply(_reply("eve@notacme.com"), "acme.com")      # a look-alike domain
+    assert is_human_reply(_reply("ada@acme.com", **{"auto-submitted": "no"}), "acme.com")
