@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     # apply link. Needs Gmail's read-only scope, so the first run after turning this on signs you in again.
     job_alerts: bool = False
     job_alert_days: int = 3  # how far back to look for alert emails
+    # After each real run, check which drafts you sent and which got a reply or bounced (`status` shows it).
+    # Sent, replies and bounces need read access, used only if your Gmail token already has it (JOB_ALERTS=1
+    # gives it); without it, only "draft gone" is seen. 0 turns the tracker off.
+    track_mailbox: bool = True
     # Keep only titles that say intern/internship/new grad/co-op. 0 keeps every role the portal sent.
     job_alert_internships_only: bool = True
     # Optional run summary after `run` to Telegram and/or Discord (company names and counts only);

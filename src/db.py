@@ -67,6 +67,23 @@ CREATE TABLE IF NOT EXISTS alert_jobs (
 );
 """
 
+# Changes to tables that already exist, applied once each, in order. `PRAGMA user_version` counts how many a
+# database has had, so an old database (the runner's, say) catches up and a new one gets them all.
+MIGRATIONS: tuple[tuple[str, ...], ...] = (
+    # 1. the tracker (#18): where each drafted company stands after the draft
+    (
+        "ALTER TABLE companies ADD COLUMN stage TEXT",          # see STAGES; NULL = drafted, nothing seen yet
+        "ALTER TABLE companies ADD COLUMN stage_source TEXT",   # 'mailbox' (detected) or 'manual' (`mark`)
+        "ALTER TABLE companies ADD COLUMN stage_at TEXT",       # when the stage last changed
+        "ALTER TABLE companies ADD COLUMN sent_at TEXT",
+        "ALTER TABLE companies ADD COLUMN replied_at TEXT",
+    ),
+)
+
+# After the draft, in order. "draft gone" = the draft left Drafts but no sent copy was found (no read access,
+# or it was deleted); "bounced" = Gmail reported the address undeliverable.
+STAGES = ("draft gone", "sent", "bounced", "replied", "interview", "offer", "closed")
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -77,6 +94,12 @@ class Database:
         self.path = path
         with self._conn() as conn:
             conn.executescript(SCHEMA)
+        with self._conn() as conn:
+            version = conn.execute("PRAGMA user_version").fetchone()[0]
+            for number, steps in enumerate(MIGRATIONS[version:], start=version + 1):
+                for sql in steps:
+                    conn.execute(sql)
+                conn.execute(f"PRAGMA user_version = {number}")
 
     @contextmanager
     def _conn(self) -> Iterator[sqlite3.Connection]:
@@ -244,6 +267,57 @@ class Database:
                 "SELECT * FROM companies WHERE status != 'queued' ORDER BY updated_at DESC LIMIT ?",
                 (limit,),
             ).fetchall()
+
+    # ---- tracker (#18) -------------------------------------------------
+    def to_track(self) -> list[sqlite3.Row]:
+        """Drafted companies whose next step the mailbox can still tell: not sent yet, or sent and waiting
+        for a reply. Stages you set yourself with `mark` beyond those are left alone."""
+        with self._conn() as conn:
+            return conn.execute(
+                "SELECT domain, company_name, founder_email, draft_id, stage, sent_at, updated_at FROM companies "
+                "WHERE status = 'drafted' AND (stage IS NULL OR stage IN ('draft gone', 'sent')) "
+                "ORDER BY updated_at",
+            ).fetchall()
+
+    def set_stage(self, domain: str, stage: str, source: str, at: Optional[str] = None) -> bool:
+        """Record a drafted company's stage; `at` is when it happened (default now). False if not drafted."""
+        if stage not in STAGES:
+            raise ValueError(f"Unknown stage {stage!r}; choose from: {', '.join(STAGES)}")
+        at = at or _now()
+        extra = {"sent": ", sent_at = COALESCE(sent_at, :at)", "replied": ", replied_at = COALESCE(replied_at, :at)"}
+        with self._conn() as conn:
+            cur = conn.execute(
+                "UPDATE companies SET stage = :stage, stage_source = :source, stage_at = :at"
+                + extra.get(stage, "") + " WHERE domain = :domain AND status = 'drafted'",
+                {"stage": stage, "source": source, "at": at, "domain": domain},
+            )
+        return cur.rowcount == 1
+
+    def stage_counts(self) -> dict[str, int]:
+        """Drafted companies per stage; "drafted" counts those with nothing seen since the draft."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT COALESCE(stage, 'drafted') AS stage, COUNT(*) AS n FROM companies "
+                "WHERE status = 'drafted' GROUP BY 1").fetchall()
+        return {r["stage"]: r["n"] for r in rows}
+
+    def tracked(self, stages: tuple[str, ...] = STAGES, limit: Optional[int] = None) -> list[sqlite3.Row]:
+        """Drafted companies in the given stages, most recently changed first."""
+        marks = ", ".join("?" * len(stages))
+        sql = (f"SELECT * FROM companies WHERE status = 'drafted' AND stage IN ({marks}) "
+               "ORDER BY stage_at DESC, rowid DESC")
+        with self._conn() as conn:
+            if limit is None:
+                return conn.execute(sql, stages).fetchall()
+            return conn.execute(sql + " LIMIT ?", (*stages, limit)).fetchall()
+
+    def drafted(self) -> list[sqlite3.Row]:
+        """Every drafted company with its stage, oldest draft first (for the CSV export)."""
+        with self._conn() as conn:
+            return conn.execute(
+                "SELECT domain, company_name, founder_name, founder_email, email_source, "
+                "COALESCE(stage, 'drafted') AS stage, stage_source, updated_at AS drafted_at, sent_at, "
+                "replied_at, stage_at FROM companies WHERE status = 'drafted' ORDER BY updated_at").fetchall()
 
     def recent_events(self, limit: int = 15) -> list[sqlite3.Row]:
         with self._conn() as conn:

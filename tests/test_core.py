@@ -1534,10 +1534,170 @@ def test_cli_run_sends_summary_even_when_every_attempt_failed(monkeypatch: pytes
 
     results = [Result("down.dev", "error", "extraction failed")]
     monkeypatch.setattr(main, "_db", lambda: None)
-    monkeypatch.setattr(main, "_pipeline", lambda db, dry_run, **kw: NS(run=lambda *a, **k: results, job_alerts=lambda: [], traces=[]))
+    monkeypatch.setattr(main, "_pipeline", lambda db, dry_run, **kw: NS(
+        run=lambda *a, **k: results, job_alerts=lambda: [], traces=[], track=lambda: []))
     sent = []
     monkeypatch.setattr(main, "send_summary", lambda text, settings: sent.append(text))
 
     out = CliRunner().invoke(main.app, ["run", *args])
     assert out.exit_code == 1, out.output  # the run still fails for schedulers
     assert sent == (["seedreach: no new drafts · 0 skipped · 1 error"] if sends else [])
+
+
+# ---- tracker (#18) ---------------------------------------------------------
+class _FakeMailbox:
+    """Answers the tracker's two questions from dicts: is the draft still there, and what matches a search."""
+
+    def __init__(self, drafts=(), sent=None, replies=None, bounces=None, broken=()):
+        self.drafts, self.broken = set(drafts), set(broken)
+        self.sent, self.replies, self.bounces = sent or {}, replies or {}, bounces or {}
+
+    def draft_exists(self, draft_id):
+        if draft_id in self.broken:
+            raise RuntimeError("Gmail API error: 500")
+        return draft_id in self.drafts
+
+    def message_dates(self, query, limit=5):
+        if query.startswith("in:sent to:"):
+            return self.sent.get(query.split()[1][len("to:"):], [])
+        if query.startswith("from:mailer-daemon"):
+            return self.bounces.get(query.split('"')[1], [])
+        return self.replies.get(query.split()[0][len("from:"):], [])
+
+
+def _drafted(db, domain, draft_id):
+    db.mark_drafted(domain, f"https://{domain}", "hn", company_name=domain.split(".")[0].title(), founder_name=None,
+                    founder_email=f"ada@{domain}", email_source="mailto (on site)", draft_id=draft_id)
+
+
+def test_tracker_migration_upgrades_an_old_database(tmp_path: Path):
+    import sqlite3
+
+    from src.db import SCHEMA
+
+    path = tmp_path / "old.db"
+    with sqlite3.connect(path) as conn:  # a database from before the tracker: schema only, user_version 0
+        conn.executescript(SCHEMA)
+        conn.execute("INSERT INTO companies (domain, url, source, status, founder_email, draft_id, created_at, "
+                     "updated_at) VALUES ('acme.com', 'https://acme.com', 'hn', 'drafted', 'ada@acme.com', 'd1', "
+                     "'2026-11-01T00:00:00+00:00', '2026-11-01T00:00:00+00:00')")
+    db = Database(path)
+    Database(path)  # opening again changes nothing
+    with sqlite3.connect(path) as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(companies)")}
+    assert {"stage", "stage_source", "stage_at", "sent_at", "replied_at"} <= cols
+    assert db.stage_counts() == {"drafted": 1} and db.drafted()[0]["founder_email"] == "ada@acme.com"
+
+
+def test_tracker_follows_each_draft_through_the_mailbox(tmp_path: Path):
+    from datetime import datetime, timezone
+
+    from src.tracker import update_stages
+
+    db = Database(tmp_path / "t.db")
+    for domain, draft in (("waiting.dev", "d1"), ("gone.dev", "d2"), ("sent.dev", "d3"), ("bounce.dev", "d4"),
+                          ("met.dev", "d5"), ("broken.dev", "d6")):
+        _drafted(db, domain, draft)
+    db.set_stage("met.dev", "interview", "manual")
+    early, late = (datetime(2026, 11, d, 9, tzinfo=timezone.utc) for d in (20, 21))
+
+    # without read access, only the missing draft can be seen
+    changes = update_stages(db, _FakeMailbox(drafts={"d1"}, broken={"d6"}), can_read=False)
+    assert {(c.domain, c.stage) for c in changes} == {
+        ("gone.dev", "draft gone"), ("sent.dev", "draft gone"), ("bounce.dev", "draft gone")}
+
+    box = _FakeMailbox(drafts={"d1"}, broken={"d6"},
+                       sent={"ada@sent.dev": [late, early], "ada@bounce.dev": [early]},
+                       replies={"ada@sent.dev": [late], "ada@met.dev": [late]},
+                       bounces={"ada@bounce.dev": [late]})
+    changes = update_stages(db, box, can_read=True)
+    assert {(c.domain, c.stage) for c in changes} == {("sent.dev", "sent"), ("bounce.dev", "sent")}
+    sent_row = next(r for r in db.drafted() if r["domain"] == "sent.dev")
+    assert sent_row["sent_at"] == "2026-11-20T09:00:00+00:00"  # the earliest sent copy
+
+    changes = update_stages(db, box, can_read=True)  # next run: replies and bounces
+    assert {(c.domain, c.stage) for c in changes} == {("sent.dev", "replied"), ("bounce.dev", "bounced")}
+    stages = {r["domain"]: (r["stage"], r["stage_source"]) for r in db.drafted()}
+    assert stages["waiting.dev"] == ("drafted", None)       # still in Drafts
+    assert stages["gone.dev"] == ("draft gone", "mailbox")  # deleted, never sent
+    assert stages["met.dev"] == ("interview", "manual")      # your own stage is never overwritten
+    assert stages["broken.dev"] == ("drafted", None)         # an error for one company: retried next time
+    assert next(r for r in db.drafted() if r["domain"] == "sent.dev")["replied_at"] == "2026-11-21T09:00:00+00:00"
+    assert update_stages(db, box, can_read=True) == []      # nothing new the third time
+
+
+def test_cli_mark_export_and_status_show_the_tracker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    import csv
+
+    from typer.testing import CliRunner
+
+    import main
+
+    db = Database(tmp_path / "t.db")
+    _drafted(db, "acme.com", "d1")
+    monkeypatch.setattr(main, "_db", lambda: db)
+    runner = CliRunner()
+
+    assert runner.invoke(main.app, ["mark", "acme.com", "hired"]).exit_code == 2      # not a stage
+    assert runner.invoke(main.app, ["mark", "nodraft.dev", "offer"]).exit_code == 1   # nothing to track
+    out = runner.invoke(main.app, ["mark", "https://www.acme.com/", "Interview"])
+    assert out.exit_code == 0, out.output
+    assert (db.drafted()[0]["stage"], db.drafted()[0]["stage_source"]) == ("interview", "manual")
+
+    target = tmp_path / "tracker.csv"
+    assert runner.invoke(main.app, ["export", "--csv", str(target)]).exit_code == 0
+    with target.open(encoding="utf-8", newline="") as f:
+        rows = list(csv.reader(f))
+    assert tuple(rows[0]) == main.EXPORT_COLUMNS
+    assert rows[1][:2] == ["acme.com", "Acme"] and rows[1][5] == "interview"
+
+    out = runner.invoke(main.app, ["status"])
+    assert out.exit_code == 0, out.output
+    assert "Tracker: interview: 1" in out.output and "Replies and next steps" in out.output
+
+
+def test_gmail_draft_exists_and_message_dates():
+    from types import SimpleNamespace as NS
+
+    import httplib2
+    from googleapiclient.errors import HttpError
+
+    def http_error(status):
+        return HttpError(httplib2.Response({"status": str(status)}), b"")
+
+    def call(result=None, error=None):
+        def execute():
+            if error:
+                raise error
+            return result
+        return NS(execute=execute)
+
+    def service(get_draft, messages):
+        return NS(users=lambda: NS(
+            drafts=lambda: NS(get=lambda **kw: get_draft),
+            messages=lambda: NS(list=lambda **kw: call({"messages": [{"id": m} for m in messages]}),
+                                get=lambda id, **kw: call({"payload": {"headers": [
+                                    {"name": "Date", "value": messages[id]}]}}))))
+
+    client = gmail_client.GmailDraftClient(Path("c.json"), Path("t.json"))
+    client._service = service(call({"id": "d1"}), {})
+    assert client.draft_exists("d1") is True
+    client._service = service(call(error=http_error(404)), {})
+    assert client.draft_exists("d1") is False   # sent or deleted
+    client._service = service(call(error=http_error(500)), {})
+    with pytest.raises(gmail_client.GmailError):
+        client.draft_exists("d1")
+
+    client._service = service(call(), {"m1": "Fri, 20 Nov 2026 14:30:00 +0530", "m2": "not a date"})
+    (when,) = client.message_dates("from:ada@acme.com")
+    assert when.isoformat() == "2026-11-20T09:00:00+00:00"   # converted to UTC; the bad header is skipped
+
+
+def test_token_can_read(tmp_path: Path):
+    token = tmp_path / "token.json"
+    assert gmail_client.token_can_read(token) is False  # no token yet
+    token.write_text(json.dumps({"scopes": gmail_client.SCOPES}), encoding="utf-8")
+    assert gmail_client.token_can_read(token) is False
+    token.write_text(json.dumps({"scopes": gmail_client.SCOPES + [gmail_client.READ_SCOPE]}), encoding="utf-8")
+    assert gmail_client.token_can_read(token) is True

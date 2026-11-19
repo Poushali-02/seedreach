@@ -18,7 +18,7 @@ from src.enrichment.job_boards import JobBoardChecker
 from src.intelligence.extractor import ExtractionError, Extractor, clearly_not_software
 from src.intelligence.scraper import ScrapeError, Scraper
 from src.outreach.generator import EmailDraft, company_text, generate_email
-from src.outreach.gmail_client import GmailDraftClient, GmailError
+from src.outreach.gmail_client import GmailDraftClient, GmailError, token_can_read
 from src.profile import load_profile
 from src.sourcing.base import BaseSourcingProvider, Lead, parse_preferences, region_rank
 from src.sourcing.hacker_news import HackerNewsProvider
@@ -27,6 +27,7 @@ from src.sourcing.launch_hn import LaunchHNProvider
 from src.sourcing.product_hunt import ProductHuntProvider
 from src.sourcing.yc_directory import YCDirectoryProvider, yc_founders
 from src.trace import Trace, name_in_text
+from src.tracker import Change, update_stages
 from src.utils import domain_of, non_company_kind, normalize_url
 
 log = logging.getLogger(__name__)
@@ -131,8 +132,11 @@ class Pipeline:
         self.founder_pages: dict[str, str] = {}  # domain -> a page listing its founders (YC leads)
         self.yc_client = httpx.Client(timeout=settings.http_timeout, follow_redirects=True,
                                       headers={"User-Agent": settings.user_agent})
+        # the tracker reads mail only with a token that already allows it, so it never forces a new sign-in
+        self.can_read_mail = settings.job_alerts or (
+            settings.track_mailbox and token_can_read(settings.google_token_file))
         self.gmail = GmailDraftClient(settings.google_credentials_file, settings.google_token_file, settings.headless,
-                                      read_mail=settings.job_alerts)
+                                      read_mail=self.can_read_mail)
         if not dry_run:
             self.gmail.ensure_authenticated()  # fail before spending LLM credits
 
@@ -305,6 +309,12 @@ class Pipeline:
         self._record("INFO", domain, f"drafted to {email.email} via {email.source}{role_note}")
         return Result(domain, "drafted", f"{email.source}: {email.confidence}{role_note}", draft, email.email,
                       **about)
+
+    def track(self) -> list[Change]:
+        """Update where each drafted company stands: sent, replied or bounced (#18). Never fails the run."""
+        if not self.settings.track_mailbox:
+            return []
+        return update_stages(self.db, self.gmail, can_read=self.can_read_mail)
 
     def job_alerts(self) -> list[AlertJob]:
         """Openings from your job-alert emails that no earlier run has listed (empty unless JOB_ALERTS=1).

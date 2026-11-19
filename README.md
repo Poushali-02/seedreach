@@ -146,11 +146,41 @@ python main.py add-target --csv companies.csv   # reads a url or website column 
 # One specific startup, start to finish
 python main.py target https://example-startup.com
 
-# Totals, recent companies, recent runs (tokens, cost, time) and the event log
+# Totals, the tracker, recent companies, recent runs (tokens, cost, time) and the event log
 python main.py status
+
+# The tracker: check now which drafts you sent and which got a reply or bounced (every real `run` does this too)
+python main.py track
+python main.py mark example-startup.com interview   # stages the mailbox can't see: interview, offer, closed
+python main.py export --csv tracker.csv              # every draft and its stage, for a spreadsheet
 ```
 
 Then open Gmail > Drafts, review each draft, and send the ones you like yourself.
+
+### Track what happens after the draft
+
+After every real `run`, and whenever you run `python main.py track`, seedreach looks at your mailbox for
+each company it drafted to and records where it stands:
+
+| Stage | How it's known |
+|---|---|
+| (drafted) | The draft is still in Gmail > Drafts |
+| `sent` | The draft left Drafts, and Sent has a message to that address since the draft was made |
+| `replied` | A message from that address arrived after you sent yours |
+| `bounced` | Gmail's delivery-failure notice names that address |
+| `draft gone` | The draft left Drafts, but no sent copy was found (you deleted it, or seedreach can't read mail) |
+| `interview`, `offer`, `closed` | You set these yourself with `mark`; the tracker never changes them |
+
+- **Reading mail is optional.** Gmail deletes a draft once it's sent, so "the draft is gone" needs only the
+  draft permission seedreach already has. Seeing Sent, replies and bounces needs Gmail's read-only
+  permission. The tracker uses it **only if your saved Gmail token already has it** (turning on
+  `JOB_ALERTS=1` once gives it), so it never asks you to sign in again. It reads message dates only, never
+  the text of your emails.
+- `mark` takes any of the stages above, for example to record a reply that came from a different address.
+- `status` shows how many companies are at each stage, plus the ones that replied or moved on.
+- `export --csv` writes every draft with its stage and dates. The file holds email addresses, so keep it
+  out of git.
+- `TRACK_MAILBOX=0` turns the tracker off.
 
 ## How it works
 

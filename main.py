@@ -5,6 +5,9 @@
     python main.py add-target https://useshiplog.com
     python main.py add-target --csv companies.csv
     python main.py status
+    python main.py track
+    python main.py mark useshiplog.com interview
+    python main.py export --csv tracker.csv
 
 Drafts are only ever saved to Gmail Drafts; nothing is sent automatically.
 """
@@ -19,16 +22,19 @@ from typing import Optional
 import typer
 from rich.console import Console
 from rich.logging import RichHandler
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
 from src.config import get_settings
-from src.db import Database
+from src.db import STAGES, Database
 from src.digest import build_digest
 from src.intelligence.extractor import ExtractionError
 from src.notify import build_summary, send_summary
+from src.outreach.gmail_client import GmailDraftClient, GmailError, token_can_read
 from src.pipeline import Pipeline, Result
 from src.trace import Trace
+from src.tracker import Change, update_stages
 from src.utils import domain_of, linkedin_people_search, normalize_url
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="Cold-outreach drafts for early-stage startups.")
@@ -122,6 +128,8 @@ def run(
         console.print(f"\n[bold]{len(alerts)} new from your job alerts[/bold] (apply yourself; no draft is made)")
         for a in alerts:
             console.print(f"  {a.company}: {a.role}{', ' + a.location if a.location else ''}  [dim]{a.apply_url}[/dim]")
+    if not dry_run:
+        _print_changes(pipe.track())
     if digest is not None:  # written even when empty, so a scheduler can tell "nothing new" from "didn't run"
         digest.write_text(build_digest(results, dry_run=dry_run, alerts=alerts), encoding="utf-8")
     counts = _summary(results, dry_run)
@@ -218,15 +226,93 @@ def add_target(
     console.print(f"\nDone: {queued} queued, {already_tracked} already tracked, {invalid} invalid.")
 
 
+def _print_changes(changes: list[Change]) -> None:
+    if changes:
+        console.print(f"\n[bold]Tracker[/bold]: {len(changes)} update{'s' if len(changes) != 1 else ''}")
+        for c in changes:
+            console.print(f"  {escape(c.company)}: [bold]{c.stage}[/bold] [dim]({c.at[:10]})[/dim]")
+
+
+@app.command()
+def track() -> None:
+    """Check your mailbox for drafts you've sent, and for replies and bounces; record each company's stage."""
+    settings = get_settings()
+    if not settings.track_mailbox:
+        console.print("TRACK_MAILBOX is off, so nothing is checked.")
+        return
+    can_read = settings.job_alerts or token_can_read(settings.google_token_file)
+    gmail = GmailDraftClient(settings.google_credentials_file, settings.google_token_file, settings.headless,
+                             read_mail=can_read)
+    try:
+        gmail.ensure_authenticated()
+    except GmailError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+    if not can_read:
+        console.print("[yellow]Your Gmail token can only write drafts, so only drafts that left Drafts are seen "
+                      "('draft gone'). Sent, replies and bounces need read access: run once with JOB_ALERTS=1 "
+                      "to sign in with it.[/yellow]")
+    changes = update_stages(_db(), gmail, can_read)
+    _print_changes(changes)
+    if not changes:
+        console.print("No changes.")
+
+
+@app.command()
+def mark(
+    domain: str = typer.Argument(..., help="The company's website or domain."),
+    stage: str = typer.Argument(..., help=" | ".join(STAGES)),
+) -> None:
+    """Set where a drafted company stands yourself, e.g. interview, offer or closed."""
+    try:
+        name = domain_of(normalize_url(domain))
+        found = _db().set_stage(name, stage.lower(), "manual")
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(2)
+    if not found:
+        console.print(f"[yellow]{name} has no draft, so there's nothing to track.[/yellow]")
+        raise typer.Exit(1)
+    console.print(f"{name}: [bold]{stage.lower()}[/bold]")
+
+
+EXPORT_COLUMNS = ("domain", "company_name", "founder_name", "founder_email", "email_source", "stage", "stage_source",
+                  "drafted_at", "sent_at", "replied_at", "stage_at")
+
+
+@app.command()
+def export(csv: Path = typer.Option(..., "--csv", help="Where to write the CSV (it holds email addresses: "
+                                                      "keep it out of git).")) -> None:
+    """Write every drafted company and where it stands to a CSV, for a spreadsheet."""
+    rows = _db().drafted()
+    with csv.open("w", newline="", encoding="utf-8") as f:
+        writer = csv_mod.writer(f)
+        writer.writerow(EXPORT_COLUMNS)
+        writer.writerows([r[c] for c in EXPORT_COLUMNS] for r in rows)
+    console.print(f"Wrote {len(rows)} compan{'y' if len(rows) == 1 else 'ies'} to {csv}")
+
+
 @app.command()
 def status(events: int = typer.Option(10, "--events", "-e", help="How many recent log events to show.")) -> None:
-    """Show totals, recent drafts and the event log."""
+    """Show totals, the tracker, recent drafts, recent runs and the event log."""
     db = _db()
     s = db.stats()
     console.print(
         f"Companies tracked: [bold]{s['total']}[/bold]   Drafts created: [green]{s['drafted']}[/green]   "
         f"Skipped: [yellow]{s['skipped']}[/yellow]   Queued: {s['queued']}"
     )
+    stages = db.stage_counts()
+    if set(stages) - {"drafted"}:
+        console.print("Tracker: " + "   ".join(f"{k}: {stages[k]}" for k in ("drafted", *STAGES) if stages.get(k)))
+        moving = db.tracked(("replied", "interview", "offer", "bounced"), 10)
+        if moving:
+            table = Table(title="Replies and next steps")
+            for col in ("Company", "Stage", "Since", "Address"):
+                table.add_column(col)
+            for r in moving:
+                table.add_row(escape(r["company_name"] or r["domain"]), r["stage"], (r["stage_at"] or "")[:10],
+                              escape(r["founder_email"] or "-"))
+            console.print(table)
     recent = db.recent_companies(10)
     if recent:
         table = Table(title="Recent companies")
