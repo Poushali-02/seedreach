@@ -1,0 +1,90 @@
+README.md
+  s_20e44baaa76e3e::t_b49df97c50bd97 250-251
+docs/ARCHITECTURE.md
+  s_20e44baaa76e3e::t_b49df97c50bd97 69
+src/intelligence/scraper.py
+  s_20e44baaa76e3e::t_b49df97c50bd97 165-170
+src/pipeline.py
+  s_20e44baaa76e3e::t_b49df97c50bd97 160-170
+src/profile.py
+  s_20e44baaa76e3e::t_b49df97c50bd97 83-85
+tests/test_core.py
+  s_20e44baaa76e3e::t_b49df97c50bd97 117-119,914-949
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "1a26cbeee670c84d219804af07b695ec0ff918f6",
+  "branch": "fix/mailto-addresses",
+  "prompts": {
+    "s_20e44baaa76e3e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82d5e50c-b9da-4b86-9239-3b605f7a57d9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:b0a01c45c251c7edf619dfd1683b0bf339897381d0e09ef09c1f3b062fc3d6d1",
+      "total_additions": 62,
+      "total_deletions": 3,
+      "accepted_lines": 62,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_20e44baaa76e3e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82d5e50c-b9da-4b86-9239-3b605f7a57d9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:b0a01c45c251c7edf619dfd1683b0bf339897381d0e09ef09c1f3b062fc3d6d1",
+      "stats": {
+        "total_additions": 62,
+        "total_deletions": 3,
+        "accepted_lines": 62,
+        "overriden_lines": 0,
+        "files": {
+          "README.md": {
+            "total_additions": 2,
+            "total_deletions": 1,
+            "accepted_lines": 2,
+            "overriden_lines": 0
+          },
+          "docs/ARCHITECTURE.md": {
+            "total_additions": 1,
+            "total_deletions": 1,
+            "accepted_lines": 1,
+            "overriden_lines": 0
+          },
+          "src/intelligence/scraper.py": {
+            "total_additions": 6,
+            "total_deletions": 0,
+            "accepted_lines": 6,
+            "overriden_lines": 0
+          },
+          "src/pipeline.py": {
+            "total_additions": 11,
+            "total_deletions": 1,
+            "accepted_lines": 11,
+            "overriden_lines": 0
+          },
+          "src/profile.py": {
+            "total_additions": 3,
+            "total_deletions": 0,
+            "accepted_lines": 3,
+            "overriden_lines": 0
+          },
+          "tests/test_core.py": {
+            "total_additions": 39,
+            "total_deletions": 0,
+            "accepted_lines": 39,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  },
+  "integrity": {"v":1,"commit":"1a26cbeee670c84d219804af07b695ec0ff918f6","tree":"106c1b355fcb710daeb828e368ff64a14e31b2d2","files":{"README.md":"9582e93191c538c0e447b9f653fcfcb5b9406755","docs/ARCHITECTURE.md":"731d7e961ca9a073e48105c1de577f2e5f929730","src/intelligence/scraper.py":"4b86decfe60aae19ace3e296d0e153a0ac1d3e15","src/pipeline.py":"1c8ee6a70e0005d035c1f794d6595e22eb8573a3","src/profile.py":"12c3b7f8dcd66e6dfd1497ed01d4699fe890f77b","tests/test_core.py":"9cd69363df013ce71ef8a3db38696e296d7118b4"},"digest":"9383260bcdc35544f0295ed3e39b32def029067e2b1d036ecfed29429d637b30"}
+}
