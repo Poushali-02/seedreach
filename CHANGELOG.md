@@ -5,6 +5,11 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-20
+
+After the email: seedreach now sees which drafts you sent and who replied or bounced, and drafts one
+follow-up for those that went quiet.
+
 ### Added
 - Telegram and Discord run summaries now include the count of new job-alert openings when there are any.
   The summary contains no email addresses or apply links.
@@ -280,7 +285,8 @@ First public release.
 - `HEADLESS` mode and a GitHub Actions template for scheduled runs from a private repo.
 - Contributing guide, security policy, issue templates and CI on Python 3.10 and 3.13.
 
-[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Poushali-02/seedreach/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Poushali-02/seedreach/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Poushali-02/seedreach/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Poushali-02/seedreach/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/Poushali-02/seedreach/compare/v0.5.1...v0.5.2
