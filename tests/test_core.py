@@ -1829,7 +1829,7 @@ def test_gmail_follow_up_draft_joins_the_original_thread():
     msg = message_from_bytes(base64.urlsafe_b64decode(created["message"]["raw"]))
     assert msg["In-Reply-To"] == msg["References"] == "<abc@mail.gmail.com>"
     assert msg["Subject"] == "Re: Internship - Acme"
-def test_recent_alert_jobs_returns_newest_first(tmp_path,monkeypatch):
+
 def test_recent_alert_jobs_returns_newest_first(tmp_path, monkeypatch):
     from src.db import Database
 
