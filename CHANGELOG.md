@@ -9,6 +9,14 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 - Telegram and Discord run summaries now include the count of new job-alert openings when there are any.
   The summary contains no email addresses or apply links.
 
+### Fixed
+- One bad lead no longer stops a run. An unexpected error in one company is recorded as an error for
+  that company (and retried next run), and the run moves on. Before, it ended the whole run, and a
+  queued company that kept failing stopped every later run too. A site that redirects to an address
+  that isn't a real website (such as `http://intranet/`) is now skipped as a scrape failure.
+- `profile.json` with an empty entry under `"projects"` is rejected when it's loaded, instead of making
+  every draft fail.
+
 ## [0.7.0] - 2026-11-19
 
 Fewer wasted drafts: big companies are skipped, LinkedIn job emails are read, and targets can come from a CSV.
