@@ -10,6 +10,12 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   The summary contains no email addresses or apply links.
 
 ### Fixed
+- One bad lead no longer stops a run. An unexpected error in one company is recorded as an error for
+  that company (and retried next run), and the run moves on. Before, it ended the whole run, and a
+  queued company that kept failing stopped every later run too. A site that redirects to an address
+  that isn't a real website (such as `http://intranet/`) is now skipped as a scrape failure.
+- `profile.json` with an empty entry under `"projects"` is rejected when it's loaded, instead of making
+  every draft fail.
 - A website can no longer add recipients to your draft. A `mailto:` link that lists several addresses
   (`mailto:someone@elsewhere.example,hello@company.com`) used to become the draft's whole To line, labelled
   "on site". Each address in a `mailto:` link is now read on its own (encoded ones like `%40` included), and

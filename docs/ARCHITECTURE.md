@@ -66,7 +66,7 @@ python main.py run --limit 5
 | `drafted` | A draft was saved to Gmail | Yes, never processed again |
 | `skipped` | Site unreachable, or no email found | Yes, never retried (unless `target --force`) |
 | `duplicate` | Already in the database | No, nothing to do |
-| `error` | LLM or Gmail outage | **No**, so it's retried next run |
+| `error` | LLM or Gmail outage, or any unexpected exception in that company (logged as an `ERROR` event; the run moves on to the next company) | **No**, so it's retried next run |
 
 `--dry-run` prints drafts and records nothing.
 

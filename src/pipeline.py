@@ -157,7 +157,17 @@ class Pipeline:
 
     def process(self, url: str, source: str, name_hint: Optional[str] = None, force: bool = False) -> Result:
         trace = Trace(domain=url, source=source)
-        result = self._process(url, source, name_hint, force, trace)
+        try:
+            result = self._process(url, source, name_hint, force, trace)
+        except Exception as exc:  # one bad lead must never stop the run, or block every later run
+            log.debug("Unexpected error for %s", url, exc_info=True)
+            try:
+                domain = domain_of(url)
+            except ValueError:
+                domain = url
+            detail = f"unexpected error: {type(exc).__name__}: {exc}"
+            self._record("ERROR", domain, detail)
+            result = Result(domain, "error", detail)
         if result.outcome != "duplicate":  # duplicates cost nothing and did no work
             trace.domain, trace.outcome, trace.detail = result.domain, result.outcome, result.detail
             self.traces.append(trace)
