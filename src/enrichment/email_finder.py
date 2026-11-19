@@ -48,6 +48,18 @@ def is_role_inbox(local_part: str) -> bool:
     local = local_part.lower()
     return local in _BAD_LOCALPARTS or local in _ROLE_EXACT or any(word in local for word in _ROLE_WORDS)
 
+
+_ADDRESS = re.compile(r"[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}", re.I)
+
+
+def _at_domain(address: str, domain: str) -> bool:
+    """One whole address whose host is the company's domain or a subdomain of it. Checking only the end
+    of the string would let "evil@x.example,hello@acme.com" through as an acme.com address."""
+    if not _ADDRESS.fullmatch(address):
+        return False
+    host = address.rsplit("@", 1)[1].lower()
+    return host == domain or host.endswith("." + domain)
+
 Source = Literal["apollo", "mailto", "heuristic"]
 GUESS = "guess"
 
@@ -115,7 +127,7 @@ class EmailFinder:
     @staticmethod
     def _site_addresses(domain: str, mailtos: list[str]) -> tuple[list[str], list[str]]:
         """(personal, generic) addresses at the company's domain, minus inboxes nobody reads as a person."""
-        usable = [m for m in mailtos if m.endswith("@" + domain) or m.endswith("." + domain)]
+        usable = [m for m in mailtos if _at_domain(m, domain)]
         usable = [m for m in usable if not is_role_inbox(m.split("@")[0])]
         return ([m for m in usable if m.split("@")[0] not in _GENERIC_OK],
                 [m for m in usable if m.split("@")[0] in _GENERIC_OK])

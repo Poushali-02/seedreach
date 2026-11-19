@@ -6,7 +6,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from typing import Optional
-from urllib.parse import urljoin, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -65,6 +65,13 @@ class ScrapedPage:
         return f"URL: {self.url}\nTitle: {self.title}\n{meta}\n\n{self.text}"
 
 
+def _mailto_addresses(href: str) -> list[str]:
+    """Each address in a mailto link. One link can list several ("mailto:a@x.com,b@y.com"), and a site
+    must never get to add a second recipient, so every part has to be one whole address on its own."""
+    to = unquote(href[len("mailto:"):].split("?")[0])
+    return [part.strip() for part in re.split(r"[,;]", to) if _EMAIL_RE.fullmatch(part.strip())]
+
+
 def _extract_emails(candidates: list[str]) -> list[str]:
     out: list[str] = []
     for raw in candidates:
@@ -86,8 +93,8 @@ def _parse(html: str, url: str) -> tuple[ScrapedPage, list[str]]:
             page.meta[key] = (tag.get("content") or "").strip()
 
     mailtos = [
-        a["href"][7:].split("?")[0] for a in soup.find_all("a", href=True)
-        if a["href"].lower().startswith("mailto:")
+        address for a in soup.find_all("a", href=True) if a["href"].lower().startswith("mailto:")
+        for address in _mailto_addresses(a["href"])
     ]
     # job boards can be linked, embedded in an iframe, or loaded by a script; read them before those tags go
     refs = [urljoin(url, tag.get(attr) or "") for tag, attr in
