@@ -1,0 +1,107 @@
+CHANGELOG.md
+  s_20e44baaa76e3e::t_c8897b7fcc06ae 12-19
+README.md
+  s_20e44baaa76e3e::t_2e601b189f92b4 250-251
+docs/ARCHITECTURE.md
+  s_20e44baaa76e3e::t_ab688e2e176cc6 69
+src/intelligence/scraper.py
+  s_20e44baaa76e3e::t_3b2153f1bcc0f5 158-163
+src/pipeline.py
+  s_20e44baaa76e3e::t_a7d41004db8916 160-170
+src/profile.py
+  s_20e44baaa76e3e::t_8e787bf38031b0 83-85
+tests/test_core.py
+  s_20e44baaa76e3e::t_eb31d4811dd7c9 117-119,894-895,898-902,904-926,928-929
+  s_20e44baaa76e3e::t_10a06055af724f 896-897
+  s_20e44baaa76e3e::t_d86e7b137b8906 903
+  s_20e44baaa76e3e::t_697325db6a4391 927
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "0c5813b103a74143d95c9b70608e129364d29b44",
+  "branch": "fix/one-bad-lead",
+  "prompts": {
+    "s_20e44baaa76e3e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82d5e50c-b9da-4b86-9239-3b605f7a57d9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:d8e34ec41f1c5f86ef951da12ca76703e7ea213e72c600315aefea27e7f07a82",
+      "total_additions": 74,
+      "total_deletions": 7,
+      "accepted_lines": 70,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_20e44baaa76e3e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82d5e50c-b9da-4b86-9239-3b605f7a57d9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:d8e34ec41f1c5f86ef951da12ca76703e7ea213e72c600315aefea27e7f07a82",
+      "stats": {
+        "total_additions": 74,
+        "total_deletions": 7,
+        "accepted_lines": 70,
+        "overriden_lines": 0,
+        "files": {
+          "CHANGELOG.md": {
+            "total_additions": 8,
+            "total_deletions": 0,
+            "accepted_lines": 8,
+            "overriden_lines": 0
+          },
+          "README.md": {
+            "total_additions": 2,
+            "total_deletions": 1,
+            "accepted_lines": 2,
+            "overriden_lines": 0
+          },
+          "docs/ARCHITECTURE.md": {
+            "total_additions": 1,
+            "total_deletions": 1,
+            "accepted_lines": 1,
+            "overriden_lines": 0
+          },
+          "profile.json": {
+            "total_additions": 1,
+            "total_deletions": 1,
+            "accepted_lines": 0,
+            "overriden_lines": 0
+          },
+          "src/intelligence/scraper.py": {
+            "total_additions": 6,
+            "total_deletions": 0,
+            "accepted_lines": 6,
+            "overriden_lines": 0
+          },
+          "src/pipeline.py": {
+            "total_additions": 11,
+            "total_deletions": 1,
+            "accepted_lines": 11,
+            "overriden_lines": 0
+          },
+          "src/profile.py": {
+            "total_additions": 3,
+            "total_deletions": 0,
+            "accepted_lines": 3,
+            "overriden_lines": 0
+          },
+          "tests/test_core.py": {
+            "total_additions": 42,
+            "total_deletions": 3,
+            "accepted_lines": 39,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  },
+  "integrity": {"v":1,"commit":"0c5813b103a74143d95c9b70608e129364d29b44","tree":"c443b09f0e79b76cef5126205681501abf5736d0","files":{"CHANGELOG.md":"a20b709bdd75f28c89f1c4505befc6e3416529ea","README.md":"9582e93191c538c0e447b9f653fcfcb5b9406755","docs/ARCHITECTURE.md":"731d7e961ca9a073e48105c1de577f2e5f929730","src/intelligence/scraper.py":"b0058bd693150fccfbcf0f88bd01fff8954b0cee","src/pipeline.py":"1c8ee6a70e0005d035c1f794d6595e22eb8573a3","src/profile.py":"12c3b7f8dcd66e6dfd1497ed01d4699fe890f77b","tests/test_core.py":"aae6fe617d5924ff297aea357cd0fae752ef3361"},"digest":"ec2c2d9220b07fc84ded4920f9320753259d4d8ff61bbc0f92bc61f6f362e0e0"}
+}
