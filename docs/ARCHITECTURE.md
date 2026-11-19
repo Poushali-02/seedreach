@@ -59,7 +59,10 @@ python main.py run --limit 5
    has it), a message in Sent to that address marks it `sent`, then a "Re:" message from the company's domain
    that isn't automatic or bulk mail `replied`, and a delivery failure naming it `bounced`. Stages set with `mark` (interview, offer, closed) are never
    changed. `track` runs the same check on its own.
-6. **After the run**, `run --digest FILE` writes the digest (`src/digest.py`): roles to apply for,
+6. **Follow-ups** (`src/followups.py`): for companies in the `sent` stage for `FOLLOW_UP_AFTER_DAYS`
+   with no follow-up yet, one short draft (`generate_followup`) joins the first email's Gmail thread
+   (the thread id, `In-Reply-To`/`References`, and the same subject), at most `FOLLOW_UPS_PER_RUN` a run.
+7. **After the run**, `run --digest FILE` writes the digest (`src/digest.py`): roles to apply for,
    founders to reach on LinkedIn and drafts to review, with no email addresses; the scheduled-runs
    template posts it as a GitHub issue comment. If Telegram or Discord is configured, a one-line summary
    is sent too (`src/notify.py`).
@@ -79,13 +82,14 @@ A drafted company also has a **stage** (columns `stage`, `stage_source`, `stage_
 `replied_at`): empty while the draft is in Drafts, then `sent`, `replied` or `bounced` from the mailbox,
 `draft gone` when the draft left Drafts with no sent copy found, or `interview`/`offer`/`closed` set with
 `mark`. Schema changes to existing tables go in `MIGRATIONS` in `src/db.py`, counted by
-`PRAGMA user_version`, so older databases (the runner's included) catch up when opened.
+`PRAGMA user_version`, so older databases (the runner's included) catch up when opened. Migration 2 adds
+`followup_draft_id` and `followed_up_at`, which keep follow-ups to one per company.
 
 ## Where things live
 
 | Path | Responsibility |
 |---|---|
-| `main.py` | Typer CLI: `run`, `target`, `add-target`, `status`, `track`, `mark`, `export` |
+| `main.py` | Typer CLI: `run`, `target`, `add-target`, `status`, `track`, `mark`, `export`, `followups` |
 | `src/config.py` | Settings from `.env` (Pydantic `BaseSettings`) |
 | `src/profile.py` | Loads and validates `profile.json` (your details) |
 | `src/db.py` | SQLite: companies, statuses, event log, dedupe, run traces |
@@ -94,6 +98,7 @@ A drafted company also has a **stage** (columns `stage`, `stage_source`, `stage_
 | `src/digest.py` | The run digest (`run --digest`): roles to apply for, founders to reach, drafts to review |
 | `src/notify.py` | The optional one-line run summary to Telegram or Discord |
 | `src/tracker.py` | Where each drafted company stands after the draft (sent, replied, bounced), read from the mailbox |
+| `src/followups.py` | One follow-up draft per quiet company, in the same Gmail thread as the first email |
 | `src/sourcing/` | Lead sources: one module per source |
 | `src/intelligence/` | `scraper.py` (HTML to text) and `extractor.py` (LLM to `CompanyProfile`) |
 | `src/enrichment/` | `email_finder.py`, `job_boards.py` (open internships on public job boards) and `company_facts.py` (company size from Apollo) |

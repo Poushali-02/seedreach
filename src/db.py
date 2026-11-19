@@ -78,6 +78,11 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "ALTER TABLE companies ADD COLUMN sent_at TEXT",
         "ALTER TABLE companies ADD COLUMN replied_at TEXT",
     ),
+    # 2. follow-ups (#17): at most one follow-up draft per company
+    (
+        "ALTER TABLE companies ADD COLUMN followup_draft_id TEXT",
+        "ALTER TABLE companies ADD COLUMN followed_up_at TEXT",
+    ),
 )
 
 # After the draft, in order. "draft gone" = the draft left Drafts but no sent copy was found (no read access,
@@ -317,7 +322,25 @@ class Database:
             return conn.execute(
                 "SELECT domain, company_name, founder_name, founder_email, email_source, "
                 "COALESCE(stage, 'drafted') AS stage, stage_source, updated_at AS drafted_at, sent_at, "
-                "replied_at, stage_at FROM companies WHERE status = 'drafted' ORDER BY updated_at").fetchall()
+                "replied_at, stage_at, followed_up_at FROM companies WHERE status = 'drafted' "
+                "ORDER BY updated_at").fetchall()
+
+    # ---- follow-ups (#17) ----------------------------------------------
+    def due_followups(self, sent_before: str, limit: int) -> list[sqlite3.Row]:
+        """Companies you emailed before `sent_before` (ISO time) that haven't replied, bounced or been
+        followed up yet, oldest first. Only the tracker's `sent` stage qualifies: a reply, a bounce or a stage
+        you set yourself (interview, closed...) means no follow-up."""
+        with self._conn() as conn:
+            return conn.execute(
+                "SELECT domain, company_name, founder_name, founder_email, sent_at FROM companies "
+                "WHERE status = 'drafted' AND stage = 'sent' AND followed_up_at IS NULL AND sent_at <= ? "
+                "ORDER BY sent_at LIMIT ?", (sent_before, limit),
+            ).fetchall()
+
+    def mark_followed_up(self, domain: str, draft_id: str) -> None:
+        with self._conn() as conn:
+            conn.execute("UPDATE companies SET followup_draft_id = ?, followed_up_at = ? WHERE domain = ?",
+                         (draft_id, _now(), domain))
 
     def recent_events(self, limit: int = 15) -> list[sqlite3.Row]:
         with self._conn() as conn:

@@ -27,6 +27,7 @@ from src.sourcing.launch_hn import LaunchHNProvider
 from src.sourcing.product_hunt import ProductHuntProvider
 from src.sourcing.yc_directory import YCDirectoryProvider, yc_founders
 from src.trace import Trace, name_in_text
+from src.followups import FollowUp, draft_followups
 from src.tracker import Change, update_stages
 from src.utils import domain_of, non_company_kind, normalize_url
 
@@ -315,6 +316,13 @@ class Pipeline:
         if not self.settings.track_mailbox:
             return []
         return update_stages(self.db, self.gmail, can_read=self.can_read_mail)
+
+    def follow_up(self) -> list[FollowUp]:
+        """Draft follow-ups for companies emailed a while ago with no reply (#17). Needs read access."""
+        if not (self.settings.track_mailbox and self.can_read_mail):
+            return []
+        return draft_followups(self.db, self.gmail, self.profile, self.settings.follow_up_after_days,
+                               self.settings.follow_ups_per_run)
 
     def job_alerts(self) -> list[AlertJob]:
         """Openings from your job-alert emails that no earlier run has listed (empty unless JOB_ALERTS=1).
