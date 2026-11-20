@@ -5,6 +5,10 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-20
+
+Replies reach your phone: a company brief when a founder answers, and your LinkedIn notes in the digest.
+
 ### Added
 - A company brief when a founder replies (#16). The moment the tracker sees a new reply, seedreach reads the
   company's site and writes a short brief: what they build, stack signals, anything recent, which of your
