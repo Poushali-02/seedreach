@@ -1,0 +1,9 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "62ab6bcb38274bde48cba74a98235214975b85e9",
+  "branch": "fix/reply-brief-findings",
+  "prompts": {},
+  "integrity": {"v":1,"commit":"62ab6bcb38274bde48cba74a98235214975b85e9","tree":"f5304ac79a133d28739c15f85885c758fec1fac9","files":{},"digest":"8aa15d3191ed98a82787b7803f3d4d99bc9e5e9be3bdf82580155dfc3d9f5ab0"}
+}
