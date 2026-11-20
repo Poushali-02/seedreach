@@ -5,11 +5,9 @@ Gmail deletes a draft when it's sent and keeps a new copy, labelled SENT, under 
 - the draft is gone and Sent has a message to that address since the draft: sent;
 - after that, a delivery failure naming it: bounced; a person's reply from the company's domain: replied.
 
-A reply comes from any address at the company's domain (founders often answer from a colleague's address), isn't
-marked as automatic or bulk mail, and either has a subject starting "Re:" or is a new email you answered in the
-same Gmail conversation (a founder writing "Checking in from Acme" instead of replying). Auto-replies ("Support
-request received", out of office) and product newsletters from the same company are not replies: nobody answers
-those.
+A reply has to look like one: a subject starting "Re:", from any address at the company's domain (founders often
+answer from a colleague's address), and not marked as automatic or bulk mail. Auto-replies ("Support request
+received", out of office) and product newsletters from the same company are not replies.
 
 Reading Sent and the inbox needs Gmail's read-only scope. Without it, only the first check works (it needs
 the draft scope alone), and a missing draft is recorded as "draft gone". Stages you set yourself with
@@ -35,21 +33,19 @@ REPLY_HEADERS = ["Date", "From", "Subject", "Auto-Submitted", "X-Autoreply", "X-
 
 class Mailbox(Protocol):
     def draft_exists(self, draft_id: str) -> bool: ...
-    def you_answered(self, thread_id: str) -> bool: ...
     def message_dates(self, query: str, limit: int = 5) -> list[datetime]: ...
     def message_headers(self, query: str, names: list[str], limit: int = 5) -> list[dict[str, str]]: ...
 
 
-def is_human_reply(headers: dict[str, str], domain: str, answered: bool = False) -> bool:
-    """A person writing to you: from the company's domain, not automatic or bulk mail (RFC 3834's Auto-Submitted,
-    the common X-Autoreply headers, Precedence), and either a "Re:" subject or `answered` (you replied to it in
-    its Gmail conversation). List-Unsubscribe is not a sign of bulk mail here: founders who send through a
-    mailing service (Brevo, say) get it on personal replies too. Newsletters are left out because they're neither
-    "Re:" nor answered."""
+def is_human_reply(headers: dict[str, str], domain: str) -> bool:
+    """A person answering your email: "Re:" subject, from the company's domain, not automatic or bulk mail
+    (RFC 3834's Auto-Submitted, the common X-Autoreply headers, Precedence). List-Unsubscribe is not a sign of
+    bulk mail here: founders who send through a mailing service (Brevo, say) get it on personal replies too.
+    Newsletters are left out by the "Re:" rule instead."""
     host = parseaddr(headers.get("from", ""))[1].lower().rsplit("@", 1)[-1]
     if not (host == domain or host.endswith("." + domain)):
         return False
-    if not (answered or re.match(r"\s*re\s*:", headers.get("subject", ""), re.I)):
+    if not re.match(r"\s*re\s*:", headers.get("subject", ""), re.I):
         return False
     if headers.get("auto-submitted", "no").strip().lower() != "no":
         return False
@@ -101,20 +97,6 @@ def _sender_name(headers: dict[str, str]) -> str:
     return "" if "@" in name else name
 
 
-def _replies(found: list[dict[str, str]], domain: str, mailbox: Mailbox) -> list[tuple[datetime, str]]:
-    """(when, who) for each message that is a person writing to you. A "Re:" is checked by its headers alone;
-    any other email from the company costs one more look: whether you answered it."""
-    out = []
-    for h in found:
-        when = header_date(h.get("date", ""))
-        if when is None:
-            continue
-        if is_human_reply(h, domain) or (is_human_reply(h, domain, answered=True)
-                                         and mailbox.you_answered(h.get("thread-id", ""))):
-            out.append((when, _sender_name(h)))
-    return out
-
-
 def _next_stage(row, address: str, stage: Optional[str], mailbox: Mailbox,
                 can_read: bool) -> Optional[tuple[str, ...]]:
     """(stage, when[, who]) the mailbox shows now, or None when nothing new can be told."""
@@ -138,7 +120,8 @@ def _next_stage(row, address: str, stage: Optional[str], mailbox: Mailbox,
             return ("bounced", _iso(min(bounced)))
         domain = address.rsplit("@", 1)[-1]
         found = mailbox.message_headers(f"from:{domain} after:{since}", REPLY_HEADERS, limit=10)
-        replies = _replies(found, domain, mailbox)
+        replies = [(d, _sender_name(h)) for h in found
+                   if is_human_reply(h, domain) and (d := header_date(h.get("date", "")))]
         if replies:
             when, who = min(replies)
             return ("replied", _iso(when), who)

@@ -20,11 +20,6 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   GitHub comment; `python main.py linkedin [domain]` shows them on your computer. You paste them yourself:
   seedreach never logs in to LinkedIn.
 
-### Fixed
-- The tracker missed replies that weren't a "Re:": a founder writing a new email such as "Checking in from
-  Acme". A new email from the company's domain now counts as a reply when you answered it in the same
-  Gmail conversation, so newsletters and automatic receipts still don't.
-
 ## [0.8.0] - 2026-11-20
 
 After the email: seedreach now sees which drafts you sent and who replied or bounced, and drafts one

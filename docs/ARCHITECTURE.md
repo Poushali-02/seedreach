@@ -56,9 +56,8 @@ python main.py run --limit 5
    once. They don't enter the pipeline above: an alert names a company, not its website.
 5. **The tracker** (`src/tracker.py`, unless `TRACK_MAILBOX=0`) checks every drafted company still in
    play: a draft that left Drafts was sent or deleted; with Gmail read access (only if the token already
-   has it), a message in Sent to that address marks it `sent`, then a message from the company's domain
-   that isn't automatic or bulk mail and is either a "Re:" or a new email you answered in its Gmail
-   conversation (`you_answered`: thread labels only) `replied`, and a delivery failure naming it `bounced`. Stages set with `mark` (interview, offer, closed) are never
+   has it), a message in Sent to that address marks it `sent`, then a "Re:" message from the company's domain
+   that isn't automatic or bulk mail `replied`, and a delivery failure naming it `bounced`. Stages set with `mark` (interview, offer, closed) are never
    changed. `track` runs the same check on its own.
    **A new reply** gets one brief (`src/briefs.py`): the site is scraped again and `Extractor.ask` fills a
    `CompanyBrief` schema (what they build, stack signals, recent news, your closest project, five

@@ -177,31 +177,17 @@ class GmailDraftClient:
 
     def message_headers(self, query: str, names: list[str], limit: int = 5) -> list[dict[str, str]]:
         """The named headers (keys lower-cased) of each message matching a Gmail search, newest first. Never
-        reads message bodies, and leaves Spam and Trash out. Needs the read-only scope.
-
-        Each dict also has "thread-id": the Gmail conversation the message is in (not a real header)."""
+        reads message bodies, and leaves Spam and Trash out. Needs the read-only scope."""
         try:
             listed = self.service.users().messages().list(userId="me", q=query, maxResults=limit).execute()
             found: list[dict[str, str]] = []
             for ref in listed.get("messages") or []:
                 msg = self.service.users().messages().get(
                     userId="me", id=ref["id"], format="metadata", metadataHeaders=names).execute()
-                headers = {h["name"].lower(): h["value"] for h in (msg.get("payload") or {}).get("headers") or []}
-                headers["thread-id"] = msg.get("threadId") or ref.get("threadId") or ""
-                found.append(headers)
+                found.append({h["name"].lower(): h["value"] for h in (msg.get("payload") or {}).get("headers") or []})
         except HttpError as exc:
             raise GmailError(f"Gmail API error: {exc}") from exc
         return found
-
-    def you_answered(self, thread_id: str) -> bool:
-        """Whether a Gmail conversation holds a message you sent: labels only, no text. Needs the read-only scope."""
-        if not thread_id:
-            return False
-        try:
-            thread = self.service.users().threads().get(userId="me", id=thread_id, format="minimal").execute()
-        except HttpError as exc:
-            raise GmailError(f"Gmail API error: {exc}") from exc
-        return any("SENT" in (m.get("labelIds") or []) for m in thread.get("messages") or [])
 
     def first_sent(self, to: str, after: str) -> Optional[SentMessage]:
         """The earliest email in Sent to `to` since `after` (YYYY/MM/DD), or None. Needs the read-only scope."""

@@ -172,7 +172,7 @@ each company it drafted to and records where it stands:
 |---|---|
 | (drafted) | The draft is still in Gmail > Drafts |
 | `sent` | The draft left Drafts, and Sent has a message to that address since the draft was made |
-| `replied` | Someone at the company wrote to you after you sent yours: a "Re:" message from their domain, or a new email from their domain that you answered (a founder writing "Checking in from Acme"). Auto-replies and product newsletters don't count |
+| `replied` | Someone at the company answered: a "Re:" message from their domain after you sent yours. Auto-replies and product newsletters don't count |
 | `bounced` | Gmail's delivery-failure notice names that address |
 | `draft gone` | The draft left Drafts, but no sent copy was found (you deleted it, or seedreach can't read mail) |
 | `interview`, `offer`, `closed` | You set these yourself with `mark`; the tracker never changes them |

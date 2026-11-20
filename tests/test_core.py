@@ -1549,13 +1549,9 @@ def test_cli_run_sends_summary_even_when_every_attempt_failed(monkeypatch: pytes
 class _FakeMailbox:
     """Answers the tracker's two questions from dicts: is the draft still there, and what matches a search."""
 
-    def __init__(self, drafts=(), sent=None, replies=None, bounces=None, broken=(), answered=()):
+    def __init__(self, drafts=(), sent=None, replies=None, bounces=None, broken=()):
         self.drafts, self.broken = set(drafts), set(broken)
         self.sent, self.replies, self.bounces = sent or {}, replies or {}, bounces or {}  # replies: domain -> headers
-        self.answered = set(answered)  # Gmail conversations (thread ids) you wrote in
-
-    def you_answered(self, thread_id):
-        return thread_id in self.answered
 
     def draft_exists(self, draft_id):
         if draft_id in self.broken:
@@ -2025,29 +2021,16 @@ BRIEF = {
 }
 
 
-def test_a_new_email_you_answered_counts_as_a_reply(tmp_path: Path):
-    from datetime import datetime, timezone
-
-    from src.tracker import update_stages
+def test_a_reply_change_names_the_sender_but_never_the_address(tmp_path: Path):
+    from src.tracker import _sender_name, update_stages
 
     db = Database(tmp_path / "t.db")
-    for domain, draft in (("useshiplog.com", "d1"), ("acme.com", "d2")):
-        _drafted(db, domain, draft)
-        db.set_stage(domain, "sent", "mailbox", "2026-11-06T11:51:00+00:00")
-    checking_in = _reply('"Ada Lovelace" <ada@useshiplog.com>', subject="Checking in from Shiplog",
-                         **{"thread-id": "t1"})
-    receipt = _reply("ada@acme.com", subject="Support Request Received", **{"thread-id": "t2"})
-    box = _FakeMailbox(replies={"useshiplog.com": [checking_in], "acme.com": [receipt]})
-    assert update_stages(db, box, can_read=True) == []  # a new email you never answered is not a reply
-
-    box.answered = {"t1", "t2"}  # you answered both; the receipt is still automatic mail
-    receipt["auto-submitted"] = "auto-replied"
+    _drafted(db, "useshiplog.com", "d1")
+    db.set_stage("useshiplog.com", "sent", "mailbox", "2026-11-06T11:51:00+00:00")
+    box = _FakeMailbox(replies={"useshiplog.com": [_reply('"Ada Lovelace" <ada@useshiplog.com>')]})
     (change,) = update_stages(db, box, can_read=True)
-    assert (change.domain, change.stage, change.who) == ("useshiplog.com", "replied", "Ada Lovelace")
-    assert change.at == "2026-11-21T09:00:00+00:00"
-
-    from src.tracker import _sender_name
-    assert _sender_name({"from": "ada@acme.com"}) == ""  # never the address: it goes to your phone
+    assert (change.stage, change.who, change.at) == ("replied", "Ada Lovelace", "2026-11-21T09:00:00+00:00")
+    assert _sender_name({"from": "ada@useshiplog.com"}) == ""  # no display name: nothing, not the address
 
 
 def _brief_tools(replies, pages=None):
