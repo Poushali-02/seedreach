@@ -344,7 +344,7 @@ def export(csv: Path = typer.Option(..., "--csv", help="Where to write the CSV (
 
 @app.command()
 def status(events: int = typer.Option(10, "--events", "-e", help="How many recent log events to show.")) -> None:
-    """Show totals, the tracker, recent drafts, recent runs and the event log."""
+    """Show totals, the tracker, recent drafts, job alerts, recent runs and the event log."""
     db = _db()
     s = db.stats()
     console.print(
@@ -394,6 +394,20 @@ def status(events: int = typer.Option(10, "--events", "-e", help="How many recen
         for r in waiting:
             find = linkedin_people_search(r["founder_name"], r["company_name"] or "") if r["founder_name"] else "-"
             table.add_row(r["domain"], r["company_name"] or "-", r["founder_name"] or "-", r["reason"], find)
+        console.print(table)
+    alerts = db.recent_alert_jobs(10)
+    if alerts:
+        table = Table(title="From your job alerts")
+        for col in ("Company", "Role", "Location", "Portal", "First seen"):
+            table.add_column(col)
+        for row in alerts:
+            table.add_row(
+                escape(row["company"]),
+                escape(row["role"]),
+                escape(row["location"] or "-"),
+                row["portal"],
+                row["first_seen"][:10],
+            )
         console.print(table)
     log_rows = db.recent_events(events)
     if log_rows:

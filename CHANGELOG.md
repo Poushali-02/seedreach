@@ -5,6 +5,8 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+- Show recent job openings from alert emails in `python main.py status` (#83).
+
 ## [0.8.0] - 2026-11-20
 
 After the email: seedreach now sees which drafts you sent and who replied or bounced, and drafts one
@@ -43,6 +45,7 @@ follow-up for those that went quiet.
 Fewer wasted drafts: big companies are skipped, LinkedIn job emails are read, and targets can come from a CSV.
 
 ### Added
+
 - LinkedIn's job emails are read too (#36): with `JOB_ALERTS=1`, new internships from emails such as
   "New jobs similar to ..." (`jobs-noreply@linkedin.com`) are listed in the digest with the company,
   role, place and a plain link to the job page, without LinkedIn's tracking parts.

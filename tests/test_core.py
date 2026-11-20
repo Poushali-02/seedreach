@@ -1829,3 +1829,90 @@ def test_gmail_follow_up_draft_joins_the_original_thread():
     msg = message_from_bytes(base64.urlsafe_b64decode(created["message"]["raw"]))
     assert msg["In-Reply-To"] == msg["References"] == "<abc@mail.gmail.com>"
     assert msg["Subject"] == "Re: Internship - Acme"
+
+def test_recent_alert_jobs_returns_newest_first(tmp_path, monkeypatch):
+    from src.db import Database
+
+    db = Database(tmp_path / "test.db")
+    timestamps = iter(("2026-11-14T10:00:00+00:00", "2026-11-15T10:00:00+00:00"))
+    monkeypatch.setattr("src.db._now", lambda: next(timestamps))
+
+    db.add_alert_job("LinkedIn", "Older Labs", "Java Intern", "https://example.com/old")
+    db.add_alert_job("LinkedIn", "Newer Labs", "Python Intern", "https://example.com/new")
+
+    assert [row["company"] for row in db.recent_alert_jobs(2)] == [
+        "Newer Labs",
+        "Older Labs",
+    ]
+    assert len(db.recent_alert_jobs(1)) == 1
+
+
+def test_status_shows_job_alerts_only_when_present(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    import main
+    from src.db import Database
+
+    db = Database(tmp_path / "test.db")
+    monkeypatch.setattr(main, "_db", lambda: db)
+    runner = CliRunner()
+
+    empty_result = runner.invoke(main.app, ["status"])
+    assert empty_result.exit_code == 0, empty_result.output
+    assert "From your job alerts" not in empty_result.output
+
+    db.add_alert_job(
+        "LinkedIn", "Example Labs", "Python Intern", "https://example.com/job", "Remote")
+
+    result = runner.invoke(main.app, ["status"])
+    assert result.exit_code == 0, result.output
+    assert "From your job alerts" in result.output
+    assert "Example Labs" in result.output
+    assert "Python Intern" in result.output
+
+
+def test_status_preserves_brackets_in_job_alerts(tmp_path, monkeypatch):
+    from rich.console import Console
+    from typer.testing import CliRunner
+
+    import main
+    from src.db import Database
+
+    db = Database(tmp_path / "test.db")
+    monkeypatch.setattr(main, "_db", lambda: db)
+    monkeypatch.setattr(main, "console", Console(width=200, color_system=None))
+
+    db.add_alert_job(
+        "LinkedIn",
+        "Example [Labs]",
+        "Intern [Summer 2027] [/b]",
+        "https://example.com/brackets",
+        "Remote [EU]",
+    )
+
+    result = CliRunner().invoke(main.app, ["status"])
+
+    assert result.exit_code == 0, result.output
+    assert "Example [Labs]" in result.output
+    assert "Intern [Summer 2027] [/b]" in result.output
+    assert "Remote [EU]" in result.output
+
+
+def test_recent_alert_jobs_orders_equal_timestamps(tmp_path, monkeypatch):
+    from src.db import Database
+
+    monkeypatch.setattr("src.db._now", lambda: "2026-11-19T10:00:00+00:00")
+    db = Database(tmp_path / "test.db")
+
+    db.add_alert_job(
+        "LinkedIn", "First Labs", "Java Intern", "https://example.com/first"
+    )
+    db.add_alert_job(
+        "LinkedIn", "Second Labs", "Python Intern", "https://example.com/second"
+    )
+
+    rows = db.recent_alert_jobs(2)
+    assert [row["company"] for row in rows] == ["Second Labs", "First Labs"]
+
+    limited_rows = db.recent_alert_jobs(1)
+    assert [row["company"] for row in limited_rows] == ["Second Labs"]

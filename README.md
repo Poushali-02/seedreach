@@ -146,7 +146,7 @@ python main.py add-target --csv companies.csv   # reads a url or website column 
 # One specific startup, start to finish
 python main.py target https://example-startup.com
 
-# Totals, the tracker, recent companies, recent runs (tokens, cost, time) and the event log
+# Totals, the tracker, recent companies, recent job alerts, recent runs (tokens, cost, time) and the event log
 python main.py status
 
 # The tracker: check now which drafts you sent and which got a reply or bounced (every real `run` does this too)

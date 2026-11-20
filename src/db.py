@@ -267,6 +267,7 @@ class Database:
             ).fetchall()
 
     def recent_companies(self, limit: int = 10) -> list[sqlite3.Row]:
+
         with self._conn() as conn:
             return conn.execute(
                 "SELECT * FROM companies WHERE status != 'queued' ORDER BY updated_at DESC LIMIT ?",
@@ -341,6 +342,14 @@ class Database:
         with self._conn() as conn:
             conn.execute("UPDATE companies SET followup_draft_id = ?, followed_up_at = ? WHERE domain = ?",
                          (draft_id, _now(), domain))
+
+    def recent_alert_jobs(self, limit: int = 10) -> list[sqlite3.Row]:
+        with self._conn() as conn:
+            return conn.execute(
+                "SELECT company, role, location, portal, first_seen FROM alert_jobs "
+                "ORDER BY first_seen DESC, rowid DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
 
     def recent_events(self, limit: int = 15) -> list[sqlite3.Row]:
         with self._conn() as conn:
