@@ -19,15 +19,26 @@ from src.utils import display_name
 log = logging.getLogger(__name__)
 
 TELEGRAM_URL = "https://api.telegram.org/bot{token}/sendMessage"
-TELEGRAM_LIMIT, DISCORD_LIMIT = 4096, 2000  # characters per message; longer ones are refused
+TELEGRAM_LIMIT, DISCORD_LIMIT = 4096, 2000  # per message, longer ones are refused; counted in UTF-16 units
+
+
+def _units(text: str) -> int:
+    """Length as the apps count it: UTF-16 code units, so an emoji or other character beyond U+FFFF is 2."""
+    return len(text.encode("utf-16-le")) // 2
 
 
 def _fit(text: str, limit: int) -> str:
-    """`text`, cut at a line break to fit `limit` when it's longer, with a note that it was cut."""
-    if len(text) <= limit:
+    """`text`, cut at a line break to fit `limit` UTF-16 units when it's longer, with a note that it was cut.
+    Cuts fall between whole characters, never inside one."""
+    if _units(text) <= limit:
         return text
     note = "\n(cut to fit this app)"
-    head = text[: limit - len(note)]
+    budget, used, end = limit - _units(note), 0, 0
+    for end, ch in enumerate(text):
+        used += _units(ch)
+        if used > budget:
+            break
+    head = text[:end]
     return (head.rsplit("\n", 1)[0] if "\n" in head else head) + note
 
 

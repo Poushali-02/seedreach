@@ -108,14 +108,15 @@ jobs:
           ONLY_TRACK: ${{ github.event.schedule == '0 4-16/2 * * *' && '1' || '' }}
         run: |
           if [ -n "$ONLY_TRACK" ]; then
-            python main.py track --briefs "$GITHUB_WORKSPACE/briefs"
+            python main.py track --briefs "$GITHUB_WORKSPACE/state/briefs"
           else
             python main.py run --limit "$LIMIT" --source "$SOURCE" $DRY_RUN --digest "$GITHUB_WORKSPACE/digest.md" \
-              --briefs "$GITHUB_WORKSPACE/briefs"
+              --briefs "$GITHUB_WORKSPACE/state/briefs"
           fi
 
       # A founder replied: one new issue per company with the brief, @-mentioning you so the GitHub mobile app
       # notifies you at once. The brief comes from the company's public site; it has no email addresses.
+      # Each alert is a file in the state branch until its issue exists, so a failed one is retried next run.
       - name: Open an issue for each reply
         if: ${{ always() }}
         env:
@@ -123,10 +124,14 @@ jobs:
           OWNER: ${{ github.repository_owner }}
         run: |
           shopt -s nullglob
-          for f in "$GITHUB_WORKSPACE"/briefs/*.md; do
+          for f in "$GITHUB_WORKSPACE"/state/briefs/*.md; do
             title="$(head -n 1 "$f" | sed 's/^# //')"
             { echo "@$OWNER"; echo; tail -n +3 "$f"; } > "$RUNNER_TEMP/brief.md"
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$RUNNER_TEMP/brief.md"
+            if gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$RUNNER_TEMP/brief.md"; then
+              rm "$f"
+            else
+              echo "::warning::Issue for $(basename "$f" .md) not opened; it's kept and tried again next run."
+            fi
           done
 
       # Comments on one issue, "seedreach: apply and reach out", and @-mentions you, so the GitHub mobile app
@@ -157,7 +162,7 @@ jobs:
         run: |
           git config user.name "seedreach-bot"
           git config user.email "seedreach-bot@users.noreply.github.com"
-          git add outreach.db
+          git add -A .                     # outreach.db, and reply alerts whose issue isn't open yet
           git diff --cached --quiet && echo "No changes to save." && exit 0
           git commit -m "state: run ${{ github.run_number }}"
           git push

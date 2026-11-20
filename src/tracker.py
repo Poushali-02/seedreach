@@ -20,6 +20,7 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from email.header import decode_header, make_header
 from email.utils import parseaddr
 from typing import Optional, Protocol
 
@@ -86,14 +87,20 @@ def update_stages(db: Database, mailbox: Mailbox, can_read: bool) -> list[Change
             log.warning("Tracker: could not check %s (%s)", domain, exc)
             continue
         if new is not None and new[0] != stage:
-            db.set_stage(domain, new[0], "mailbox", new[1])
+            db.set_stage(domain, new[0], "mailbox", new[1], who=new[2] if len(new) > 2 else "")
             changes.append(Change(domain, company, *new))
     return changes
 
 
 def _sender_name(headers: dict[str, str]) -> str:
-    """The display name only ("Ada Lovelace"), never the address: it's shown in messages to your phone."""
-    name = parseaddr(headers.get("from", ""))[0].strip().strip('"')
+    """The display name only ("Ada Lovelace"), never the address: it's shown in messages to your phone.
+    MIME-encoded names ("=?UTF-8?Q?Jos=C3=A9?=") are decoded."""
+    name = parseaddr(headers.get("from", ""))[0]
+    try:
+        name = str(make_header(decode_header(name)))
+    except (ValueError, LookupError, UnicodeError):  # a malformed or unknown charset: keep it as it came
+        pass
+    name = " ".join(name.split()).strip('"')
     return "" if "@" in name else name
 
 

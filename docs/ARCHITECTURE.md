@@ -59,11 +59,16 @@ python main.py run --limit 5
    has it), a message in Sent to that address marks it `sent`, then a "Re:" message from the company's domain
    that isn't automatic or bulk mail `replied`, and a delivery failure naming it `bounced`. Stages set with `mark` (interview, offer, closed) are never
    changed. `track` runs the same check on its own.
-   **A new reply** gets one brief (`src/briefs.py`): the site is scraped again and `Extractor.ask` fills a
-   `CompanyBrief` schema (what they build, stack signals, recent news, your closest project, five
-   questions). It's sent with `send_summary` (cut to Telegram's and Discord's limits) and, with
-   `--briefs DIR`, written as `<domain>.md` for the scheduled-runs template to open a GitHub issue with.
-   Briefs never read email text; addresses and `@` mentions are taken out.
+   **Reply alerts** (`src/briefs.py`, `deliver_replies`) run after the tracker on every real `run` and
+   `track`, for each company with `replied_at` set and no `reply_alerted_at` (from the database, not this
+   run's changes, so a failed alert is retried). The site is scraped again and `Extractor.ask` fills a
+   `CompanyBrief` schema (what they build, up to 5 stack signals, up to 3 recent items, your closest
+   project, exactly five questions; out-of-bounds answers are refused and retried once). The brief is saved
+   as JSON only when generation worked; otherwise the alert goes out without it. With `--briefs DIR` the
+   alert is written as `<domain>.md` first; if that fails nothing is sent and it stays due. Then it's
+   printed and sent with `send_summary` (cut to Telegram's and Discord's limits in UTF-16 units), and the
+   company is marked alerted. The scheduled-runs template keeps `<domain>.md` in the state branch until its
+   GitHub issue opens. Briefs never read email text; addresses and `@` mentions are taken out.
 6. **Follow-ups** (`src/followups.py`): for companies in the `sent` stage for `FOLLOW_UP_AFTER_DAYS`
    with no follow-up yet, one short draft (`generate_followup`) joins the first email's Gmail thread
    (the thread id, `In-Reply-To`/`References`, and the same subject), at most `FOLLOW_UPS_PER_RUN` a run.
@@ -91,7 +96,8 @@ A drafted company also has a **stage** (columns `stage`, `stage_source`, `stage_
 `PRAGMA user_version`, so older databases (the runner's included) catch up when opened. Migration 2 adds
 `followup_draft_id` and `followed_up_at`, which keep follow-ups to one per company. Migration 3 adds
 `linkedin_note` and `linkedin_message` (`generate_linkedin`, saved on real runs for companies with a named
-founder and shown by `linkedin`). Migration 4 adds `reply_brief` and `briefed_at`, one brief per company.
+founder and shown by `linkedin`). Migration 4 adds `reply_brief` and `briefed_at`; migration 5 adds `replied_by` (the sender's
+display name) and `reply_alerted_at`, marking replies seen before it as already alerted.
 
 ## Where things live
 

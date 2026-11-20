@@ -10,9 +10,10 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
   company's site and writes a short brief: what they build, stack signals, anything recent, which of your
   projects fits and why, and five questions to ask. It's sent to Telegram/Discord when set up, and
   `run`/`track --briefs DIR` writes it for the scheduled-runs template, which opens a GitHub issue that
-  @-mentions you. The template now also checks for replies every 2 hours during the day.
-  `python main.py brief <domain>` shows it again. One per company; built from the public site only, never
-  from your email, and with no email addresses.
+  @-mentions you. The template now also checks for replies every 2 hours from 09:30 to 21:30 IST.
+  `python main.py brief <domain>` shows it again. One alert per company, retried until it's delivered
+  (and the GitHub issue until it opens); if the brief can't be written, the alert still goes out without
+  it. Built from the public site only, never from your email, and with no email addresses.
 - Show recent job openings from alert emails in `python main.py status` (#83).
 - LinkedIn connection notes (#20). When the site names a founder, seedreach writes a connection note
   within LinkedIn's limit (`LINKEDIN_NOTE_MAX`, 200 by default; 0 turns it off) and a longer message to
