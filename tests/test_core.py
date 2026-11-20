@@ -2044,6 +2044,7 @@ def test_a_reply_names_the_sender_but_never_the_address(tmp_path: Path):
     db.set_stage("useshiplog.com", "sent", "mailbox", "2026-11-06T11:51:00+00:00")  # check again, malformed name
     box = _FakeMailbox(replies={"useshiplog.com": [_reply("=?UTF-8?B?a?= <ada@useshiplog.com>")]})
     assert [c.stage for c in update_stages(db, box, can_read=True)] == ["replied"]  # still recorded
+    assert db.drafted()[0]["replied_by"] == "Jos\u00e9 Ada"  # the first sender is kept, not overwritten
 
 
 def _brief_tools(replies, pages=None):
@@ -2258,7 +2259,15 @@ def test_notify_cuts_long_messages_to_each_apps_limit():
     assert send_summary("short", settings, httpx.Client(transport=httpx.MockTransport(handler)))
     assert posted["api.telegram.org"]["text"] == "short"
 
-    emoji = "\U0001F680" * 1001  # 1,001 characters, but 2,002 UTF-16 units: over Discord's limit
+    rocket = "\U0001F680"  # 1 character, 2 UTF-16 units
+    for count in (1001, 2049):  # under each app's limit in characters, over it in UTF-16 units (Discord, Telegram)
+        assert send_summary(rocket * count, settings, httpx.Client(transport=httpx.MockTransport(handler)))
+        tg, dc = posted["api.telegram.org"]["text"], posted["discord.test"]["content"]
+        assert _units(tg) <= TELEGRAM_LIMIT and _units(dc) <= DISCORD_LIMIT
+        assert dc.endswith("(cut to fit this app)")
+        assert tg.endswith("(cut to fit this app)") == (count == 2049)
+
+    emoji = rocket * 1001
     cut = _fit(emoji, DISCORD_LIMIT)
     assert _units(cut) <= DISCORD_LIMIT and cut.endswith("(cut to fit this app)")
     assert cut.replace("\n(cut to fit this app)", "") == "\U0001F680" * len(cut.split("\n")[0])  # whole characters
