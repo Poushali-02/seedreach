@@ -1,0 +1,9 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "c4fd89d619a94172c46197f7292a1d57046fc6d2",
+  "branch": "chore/pin-template-v0.9.0",
+  "prompts": {},
+  "integrity": {"v":1,"commit":"c4fd89d619a94172c46197f7292a1d57046fc6d2","tree":"be75ff339b157250cba0ee555aed7d9b7f9f8170","files":{},"digest":"e7b6d879bd9c78a8b706d46f68063ce125aa503e3e52e3660e5ffa7d2f0a6c5f"}
+}
