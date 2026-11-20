@@ -35,7 +35,7 @@ from src.db import STAGES, Database
 from src.digest import build_digest
 from src.intelligence.extractor import ExtractionError, Extractor
 from src.intelligence.scraper import ScrapeError, Scraper
-from src.notify import build_summary, send_summary
+from src.notify import build_summary, configured, send_summary
 from src.outreach.gmail_client import GmailDraftClient, GmailError, token_can_read
 from src.pipeline import Pipeline, Result
 from src.trace import Trace
@@ -248,9 +248,11 @@ def _brief_tools() -> tuple[Scraper, Extractor]:
     return Scraper(settings), Extractor(settings)
 
 
-def _send_alert(b: ReplyBrief) -> None:
+def _send_alert(b: ReplyBrief) -> bool:
+    """Print the alert and send it to Telegram/Discord. False when they're set up and none of them took it."""
     console.print(Panel(escape(b.text()), title=escape(b.title), expand=False))
-    send_summary(b.text(), get_settings())
+    settings = get_settings()
+    return bool(send_summary(b.text(), settings)) or not configured(settings)
 
 
 def _reply_alerts(db: Database, tools: Tools, profile, folder: Optional[Path]) -> list[ReplyBrief]:

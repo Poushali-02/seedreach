@@ -75,6 +75,11 @@ def _post(client: httpx.Client, channel: str, url: str, payload: dict) -> bool:
         return False
 
 
+def configured(settings: Settings) -> bool:
+    """Whether Telegram or Discord is set up."""
+    return bool((settings.telegram_bot_token and settings.telegram_chat_id) or settings.discord_webhook_url)
+
+
 def send_summary(text: str, settings: Settings, client: Optional[httpx.Client] = None) -> list[str]:
     """Post `text` to each configured channel; return the ones that worked. Failures only log a warning."""
     targets = []

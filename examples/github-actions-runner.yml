@@ -118,7 +118,7 @@ jobs:
       # notifies you at once. The brief comes from the company's public site; it has no email addresses.
       # Each alert is a file in the state branch until its issue exists, so a failed one is retried next run.
       - name: Open an issue for each reply
-        if: ${{ always() }}
+        if: ${{ always() && !inputs.dry_run }}   # a dry run saves no state, so it would open them twice
         env:
           GH_TOKEN: ${{ github.token }}
           OWNER: ${{ github.repository_owner }}

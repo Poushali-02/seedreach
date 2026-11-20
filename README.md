@@ -234,8 +234,10 @@ It reaches you right away:
 - On your computer, `python main.py brief <domain>` shows it again; `--new` writes a fresh one.
 
 If the brief can't be written (the site is down, no LLM key, or `profile.json` can't be read), the alert
-still goes out, saying so, and `python main.py brief <domain>` writes the brief later. An alert that can't
-be delivered is tried again on the next run.
+still goes out, saying so, and `python main.py brief <domain>` writes the brief later. An alert is tried
+again on the next run until it reaches you somewhere: its GitHub issue file is written (the issue itself is
+retried until it opens), or Telegram/Discord accepted it. If you have neither set up, printing it in the
+terminal counts.
 
 Each company gets one brief. It's built from the company's public website and your profile only: seedreach
 never reads the reply itself, and the brief contains no email addresses. It never answers for you, either:

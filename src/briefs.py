@@ -188,7 +188,7 @@ def write_brief(url: str, company: str, scraper: Scraper, extractor: Extractor, 
 Tools = Callable[[], tuple[Scraper, Extractor]]
 
 
-Send = Callable[["ReplyBrief"], None]
+Send = Callable[["ReplyBrief"], bool]  # True when the alert reached you (False: try again next run)
 
 
 def _parse(saved: Optional[str]) -> Optional[CompanyBrief]:
@@ -203,8 +203,10 @@ def deliver_replies(db: Database, tools: Tools, load_profile: Callable[[], Profi
     """One alert per company with a reply and no alert yet, with its brief when one can be written.
 
     For each: the brief (saved one, or a new one, saved only if it worked), then the `<domain>.md` file in
-    `folder`, then `send` (print, Telegram/Discord), then the company is marked alerted. If the file can't be
-    written, nothing is sent and the company stays due for the next run. Never raises for one company.
+    `folder`, then `send` (print, Telegram/Discord). If the file can't be written, nothing is sent and the
+    company stays due for the next run. It's marked alerted once something reached you: the file (the
+    scheduled-runs template turns it into a GitHub issue, retried until it opens) or `send` returning True.
+    Never raises for one company.
     `tools` and `load_profile` are called at most once, and only when a brief has to be written.
     """
     due = db.reply_alerts_due()
@@ -239,9 +241,13 @@ def deliver_replies(db: Database, tools: Tools, load_profile: Callable[[], Profi
                 log.warning("Reply alert for %s not written to %s (%s); tried again next run", domain, folder, exc)
                 continue
         try:
-            send(rb)
+            sent = send(rb)
         except Exception as exc:  # a notifier problem mustn't stop the other alerts
             log.warning("Reply alert for %s not sent (%s)", domain, exc)
+            sent = False
+        if not (sent or folder is not None):
+            log.warning("Reply alert for %s reached nowhere; tried again next run", domain)
+            continue
         db.mark_reply_alerted(domain)
         out.append(rb)
     return out

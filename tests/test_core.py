@@ -2039,6 +2039,11 @@ def test_a_reply_names_the_sender_but_never_the_address(tmp_path: Path):
     assert db.reply_alerts_due()[0]["replied_by"] == "José Ada"  # kept for the alert, decoded
     assert _sender_name({"from": "ada@useshiplog.com"}) == ""  # no display name: nothing, not the address
     assert _sender_name({"from": "=?UTF-8?Q?a=40b.com?= <a@b.com>"}) == ""  # an encoded address too
+    assert _sender_name({"from": "=?UTF-8?B?a?= <ada@useshiplog.com>"}) == "=?UTF-8?B?a?="  # bad Base64: as it came
+
+    db.set_stage("useshiplog.com", "sent", "mailbox", "2026-11-06T11:51:00+00:00")  # check again, malformed name
+    box = _FakeMailbox(replies={"useshiplog.com": [_reply("=?UTF-8?B?a?= <ada@useshiplog.com>")]})
+    assert [c.stage for c in update_stages(db, box, can_read=True)] == ["replied"]  # still recorded
 
 
 def _brief_tools(replies, pages=None):
@@ -2068,7 +2073,7 @@ def test_reply_alert_is_sent_once_with_a_safe_brief(tmp_path: Path):
     _replied(db)
     tools, seen = _brief_tools(iter([BRIEF]))
     sent = []
-    (rb,) = deliver_replies(db, tools, lambda: PROFILE, tmp_path / "briefs", sent.append)
+    (rb,) = deliver_replies(db, tools, lambda: PROFILE, tmp_path / "briefs", lambda b: sent.append(b) or True)
     assert sent == [rb]
     assert seen[0]["config"].response_schema is CompanyBrief  # the brief's own schema, not the extractor's
     assert "ExampleScan" in seen[0]["contents"]  # your projects are given to pick from
@@ -2086,7 +2091,7 @@ def test_reply_alert_is_sent_once_with_a_safe_brief(tmp_path: Path):
     assert "python main.py mark useshiplog.com interview" in md
 
     assert CompanyBrief.model_validate_json(db.drafted()[0]["reply_brief"]) == rb.brief  # saved as JSON
-    assert deliver_replies(db, tools, lambda: PROFILE, None, sent.append) == []  # once: no second alert or call
+    assert deliver_replies(db, tools, lambda: PROFILE, None, lambda b: True) == []  # once: no second alert or call
     assert len(seen) == 1
 
 
@@ -2106,14 +2111,19 @@ def test_an_alert_goes_out_without_a_brief_and_the_brief_is_not_saved(tmp_path: 
         raise ProfileError("profile.json not found")
 
     sent = []
-    found = deliver_replies(db, no_key, lambda: PROFILE, None, sent.append)
+
+    def send(b):
+        sent.append(b)
+        return True
+
+    found = deliver_replies(db, no_key, lambda: PROFILE, None, send)
     assert [b.title for b in found] == ["A replied", "Ada at B replied"] and all(b.brief is None for b in found)
     assert "No brief this time" in found[0].text() and "python main.py brief a.dev" in found[0].text()
     assert db.reply_alerts_due() == [] and all(r["reply_brief"] is None for r in db.drafted())  # nothing cached
 
     _replied(db, "c.dev")
     tools, seen = _brief_tools(iter([BRIEF]))
-    (rb,) = deliver_replies(db, tools, no_profile, None, sent.append)  # profile.json broken: still alerted
+    (rb,) = deliver_replies(db, tools, no_profile, None, send)  # profile.json broken: still alerted
     assert rb.brief is None and seen == [] and len(sent) == 3
 
 
@@ -2126,12 +2136,50 @@ def test_an_alert_that_cannot_be_written_is_tried_again(tmp_path: Path):
     blocked = tmp_path / "not-a-folder"
     blocked.write_text("a file where the folder should be", encoding="utf-8")
     sent = []
-    assert deliver_replies(db, tools, lambda: PROFILE, blocked, sent.append) == []  # no exception
+
+    def send(b):
+        sent.append(b)
+        return True
+
+    assert deliver_replies(db, tools, lambda: PROFILE, blocked, send) == []  # no exception
     assert sent == [] and len(db.reply_alerts_due()) == 1  # nothing sent, still due
 
-    (rb,) = deliver_replies(db, tools, lambda: PROFILE, tmp_path / "briefs", sent.append)
+    (rb,) = deliver_replies(db, tools, lambda: PROFILE, tmp_path / "briefs", send)
     assert sent == [rb] and rb.brief is not None and len(seen) == 1  # the saved brief, no second LLM call
     assert (tmp_path / "briefs" / "useshiplog.com.md").exists()
+
+
+def test_an_alert_that_reached_nowhere_stays_due(tmp_path: Path):
+    from src.briefs import deliver_replies
+
+    db = Database(tmp_path / "t.db")
+    _replied(db)
+    tools, _ = _brief_tools(iter([BRIEF]))
+
+    def broken(b):
+        raise RuntimeError("notifier crashed")
+
+    assert deliver_replies(db, tools, lambda: PROFILE, None, lambda b: False) == []  # Telegram/Discord all failed
+    assert deliver_replies(db, tools, lambda: PROFILE, None, broken) == []
+    assert len(db.reply_alerts_due()) == 1  # still due: tried again next run
+    (rb,) = deliver_replies(db, tools, lambda: PROFILE, tmp_path / "b", lambda b: False)
+    assert db.reply_alerts_due() == []  # the file reached the GitHub issue step, which retries on its own
+
+
+def test_send_alert_counts_only_a_channel_that_took_it(monkeypatch: pytest.MonkeyPatch):
+    from rich.console import Console
+
+    import main
+    from src.briefs import ReplyBrief
+
+    rb = ReplyBrief("acme.com", "Acme", "Ada", "2026-11-17T09:00:00+00:00", None)
+    monkeypatch.setattr(main, "console", Console(width=120, color_system=None))
+    on = Settings(_env_file=None, telegram_bot_token="t", telegram_chat_id="42")
+    for settings, worked, expected in ((on, [], False), (on, ["Telegram"], True),
+                                       (Settings(_env_file=None), [], True)):  # nothing set up: printing counts
+        monkeypatch.setattr(main, "get_settings", lambda s=settings: s)
+        monkeypatch.setattr(main, "send_summary", lambda text, s, w=worked: w)
+        assert main._send_alert(rb) is expected
 
 
 def test_a_brief_needs_five_questions_and_stays_short():
@@ -2159,20 +2207,34 @@ def test_a_brief_needs_five_questions_and_stays_short():
 def test_migration_5_doesnt_resend_old_replies(tmp_path: Path):
     import sqlite3
 
-    from src.db import MIGRATIONS
+    from src.db import MIGRATIONS, SCHEMA
 
-    db = Database(tmp_path / "t.db")
-    _replied(db, "old.dev")
-    db.save_brief("old.dev", "# Ada at Old replied\n\nthe first, Markdown format")
-    with sqlite3.connect(tmp_path / "t.db") as conn:  # as it was before migration 5
-        conn.execute("UPDATE companies SET reply_alerted_at = NULL, replied_by = NULL")
+    path = tmp_path / "v4.db"
+    with sqlite3.connect(path) as conn:  # a database as #98 left it: migrations 1-4 only
+        conn.executescript(SCHEMA)
+        for steps in MIGRATIONS[:4]:
+            for sql in steps:
+                conn.execute(sql)
         conn.execute("PRAGMA user_version = 4")
-        for sql in MIGRATIONS[4]:
-            if sql.startswith("ALTER"):
-                continue  # columns exist already in this test; only the data steps are checked
-            conn.execute(sql)
+        conn.execute("INSERT INTO companies (domain, url, source, status, company_name, founder_email, created_at, "
+                     "updated_at, stage, replied_at, reply_brief, briefed_at) VALUES ('old.dev', 'https://old.dev', "
+                     "'hn', 'drafted', 'Old', 'ada@old.dev', '2026-11-01T00:00:00+00:00', '2026-11-01T00:00:00+00:00', "
+                     "'replied', '2026-11-10T00:00:00+00:00', '# Ada at Old replied', '2026-11-10T01:00:00+00:00')")
+        conn.execute("INSERT INTO companies (domain, url, source, status, company_name, founder_email, created_at, "
+                     "updated_at, stage, sent_at) VALUES ('quiet.dev', 'https://quiet.dev', 'hn', 'drafted', 'Quiet', "
+                     "'ada@quiet.dev', '2026-11-01T00:00:00+00:00', '2026-11-01T00:00:00+00:00', 'sent', "
+                     "'2026-11-02T00:00:00+00:00')")
+    db = Database(path)  # opening it runs migration 5
+    with sqlite3.connect(path) as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(companies)")}
+    assert {"replied_by", "reply_alerted_at"} <= cols
     assert db.reply_alerts_due() == []  # a reply from before the upgrade is not news
-    assert db.drafted()[0]["reply_brief"] is None  # the old format is cleared, to be written again
+    rows = {r["domain"]: r for r in db.drafted()}
+    assert rows["old.dev"]["reply_brief"] is None  # the old Markdown format is cleared, to be written again
+
+    db.set_stage("quiet.dev", "replied", "mailbox", "2026-11-21T09:00:00+00:00", who="Bo")  # a reply after it
+    assert [r["domain"] for r in db.reply_alerts_due()] == ["quiet.dev"]
 
 
 def test_notify_cuts_long_messages_to_each_apps_limit():
@@ -2217,8 +2279,8 @@ def test_run_and_track_send_reply_alerts_and_brief_shows_them(tmp_path: Path, mo
     monkeypatch.setattr(main, "_db", lambda: db)
     monkeypatch.setattr(main, "console", Console(width=200, color_system=None))
     sent = []
-    monkeypatch.setattr(main, "send_summary", lambda text, settings: sent.append(text))
-    tools, seen = _brief_tools(iter([BRIEF, BRIEF, dict(BRIEF, what_they_build="Fresh take.")]))
+    monkeypatch.setattr(main, "send_summary", lambda text, settings: sent.append(text) or ["Telegram"])
+    tools, seen = _brief_tools(iter([BRIEF, BRIEF, BRIEF, dict(BRIEF, what_they_build="Fresh take.")]))
     monkeypatch.setattr(main, "_brief_tools", tools)
     monkeypatch.setattr(main, "load_profile", lambda: PROFILE)
     runner = CliRunner()
@@ -2235,6 +2297,15 @@ def test_run_and_track_send_reply_alerts_and_brief_shows_them(tmp_path: Path, mo
     assert out.exit_code == 0, out.output
     assert [s for s in sent if s.startswith("seedreach: Ada at Useshiplog replied")]
     assert (tmp_path / "t-briefs" / "useshiplog.com.md").exists()
+
+    # a quiet `track` (nothing new in the mailbox) still sends an alert that's due, e.g. one that failed before
+    _drafted(db, "later.dev", "d-later")
+    db.set_stage("later.dev", "replied", "manual", "2026-11-17T10:00:00+00:00")  # due, but not a change now
+    monkeypatch.setattr(main, "update_stages", lambda db_, gmail, can_read: [])
+    out = runner.invoke(main.app, ["track", "--briefs", str(tmp_path / "t-briefs")])
+    assert out.exit_code == 0 and "No changes." in out.output, out.output
+    assert [s for s in sent if s.startswith("seedreach: Later replied")]
+    assert (tmp_path / "t-briefs" / "later.dev.md").exists()
 
     # `run`: the pipeline's tracker sees another reply; the same delivery happens after it
     def pipe_track():

@@ -20,6 +20,7 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from email.errors import HeaderParseError
 from email.header import decode_header, make_header
 from email.utils import parseaddr
 from typing import Optional, Protocol
@@ -98,7 +99,7 @@ def _sender_name(headers: dict[str, str]) -> str:
     name = parseaddr(headers.get("from", ""))[0]
     try:
         name = str(make_header(decode_header(name)))
-    except (ValueError, LookupError, UnicodeError):  # a malformed or unknown charset: keep it as it came
+    except (HeaderParseError, ValueError, LookupError, UnicodeError):  # malformed, or an unknown charset: as it came
         pass
     name = " ".join(name.split()).strip('"')
     return "" if "@" in name else name
