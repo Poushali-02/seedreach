@@ -29,13 +29,13 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
-from src.briefs import ReplyBrief, Tools, brief_new_replies, write_brief, write_files
+from src.briefs import CompanyBrief, ReplyBrief, Tools, deliver_replies, write_brief
 from src.config import get_settings
 from src.db import STAGES, Database
 from src.digest import build_digest
 from src.intelligence.extractor import ExtractionError, Extractor
 from src.intelligence.scraper import ScrapeError, Scraper
-from src.notify import build_summary, send_summary
+from src.notify import build_summary, configured, send_summary
 from src.outreach.gmail_client import GmailDraftClient, GmailError, token_can_read
 from src.pipeline import Pipeline, Result
 from src.trace import Trace
@@ -144,10 +144,8 @@ def run(
         for a in alerts:
             console.print(f"  {a.company}: {a.role}{', ' + a.location if a.location else ''}  [dim]{a.apply_url}[/dim]")
     if not dry_run:
-        changes = pipe.track()
-        _print_changes(changes)
-        if changes:
-            _reply_briefs(pipe.db, changes, pipe.profile, lambda: (pipe.scraper, pipe.extractor), briefs)
+        _print_changes(pipe.track())
+        _reply_alerts(pipe.db, lambda: (pipe.scraper, pipe.extractor), lambda: pipe.profile, briefs)
         _print_followups(pipe.follow_up())
     if digest is not None:  # written even when empty, so a scheduler can tell "nothing new" from "didn't run"
         digest.write_text(build_digest(results, dry_run=dry_run, alerts=alerts), encoding="utf-8")
@@ -250,15 +248,17 @@ def _brief_tools() -> tuple[Scraper, Extractor]:
     return Scraper(settings), Extractor(settings)
 
 
-def _reply_briefs(db: Database, changes: list[Change], profile, tools: Tools, folder: Optional[Path]) -> list[ReplyBrief]:
-    """For each new reply: write the brief, print it, send it to Telegram/Discord, and save it to `folder`."""
-    found = brief_new_replies(db, changes, tools, profile)
-    for b in found:
-        console.print(Panel(escape(b.text()), title=escape(b.title), expand=False))
-        send_summary(b.text(), get_settings())
-    if folder is not None and found:
-        write_files(found, folder)
-    return found
+def _send_alert(b: ReplyBrief) -> bool:
+    """Print the alert and send it to Telegram/Discord. False when they're set up and none of them took it."""
+    console.print(Panel(escape(b.text()), title=escape(b.title), expand=False))
+    settings = get_settings()
+    return bool(send_summary(b.text(), settings)) or not configured(settings)
+
+
+def _reply_alerts(db: Database, tools: Tools, profile, folder: Optional[Path]) -> list[ReplyBrief]:
+    """Every reply whose alert hasn't gone out: its brief, the `folder` file, then print and Telegram/Discord.
+    Called on every real run and `track`, so an alert that failed last time is tried again."""
+    return deliver_replies(db, tools, profile, folder, _send_alert)
 
 
 def _print_changes(changes: list[Change]) -> None:
@@ -294,13 +294,7 @@ def track(briefs: Optional[Path] = BRIEFS_OPTION) -> None:
     _print_changes(changes)
     if not changes:
         console.print("No changes.")
-        return
-    try:
-        profile = load_profile()
-    except ProfileError as exc:
-        console.print(f"[yellow]No reply brief: {exc}[/yellow]")
-        return
-    _reply_briefs(db, changes, profile, _brief_tools, briefs)
+    _reply_alerts(db, _brief_tools, lambda: load_profile(), briefs)  # also retries alerts that failed before
 
 
 @app.command()
@@ -319,19 +313,23 @@ def brief(
     if row is None:
         console.print(f"[red]{name} has no draft, so there's nothing to brief.[/red]")
         raise typer.Exit(1)
+    company, who, when = row["company_name"] or name, row["replied_by"] or "", row["replied_at"] or ""
+    saved = None
     if row["reply_brief"] and not new:
-        console.print(escape(row["reply_brief"]))
-        return
-    try:
-        profile = load_profile()
-        scraper, extractor = _brief_tools()
-        b = write_brief(db.company_url(name), row["company_name"] or name, scraper, extractor, profile)
-    except (ProfileError, ScrapeError, ExtractionError) as exc:
-        console.print(f"[red]No brief: {exc}[/red]")
-        raise typer.Exit(1)
-    rb = ReplyBrief(name, row["company_name"] or name, "", row["replied_at"] or "", b)
-    db.save_brief(name, rb.markdown())
-    console.print(escape(rb.markdown()))
+        try:
+            saved = CompanyBrief.model_validate_json(row["reply_brief"])
+        except ValueError:
+            saved = None  # an older format: write it again
+    if saved is None:
+        try:
+            profile = load_profile()
+            scraper, extractor = _brief_tools()
+            saved = write_brief(db.company_url(name), company, scraper, extractor, profile)
+        except (ProfileError, ScrapeError, ExtractionError) as exc:
+            console.print(f"[red]No brief: {exc}[/red]")
+            raise typer.Exit(1)
+        db.save_brief(name, saved.model_dump_json())
+    console.print(escape(ReplyBrief(name, company, who, when, saved).text()))
 
 
 @app.command()

@@ -1525,7 +1525,8 @@ def test_summary_send_failure_only_warns(caplog: pytest.LogCaptureFixture):
 
 
 @pytest.mark.parametrize("args, sends", [([], True), (["--dry-run"], False)])
-def test_cli_run_sends_summary_even_when_every_attempt_failed(monkeypatch: pytest.MonkeyPatch, args, sends):
+def test_cli_run_sends_summary_even_when_every_attempt_failed(monkeypatch: pytest.MonkeyPatch, args, sends,
+                                                             tmp_path: Path):
     from types import SimpleNamespace as NS
     from typer.testing import CliRunner
 
@@ -1536,7 +1537,7 @@ def test_cli_run_sends_summary_even_when_every_attempt_failed(monkeypatch: pytes
     monkeypatch.setattr(main, "_db", lambda: None)
     monkeypatch.setattr(main, "_pipeline", lambda db, dry_run, **kw: NS(
         run=lambda *a, **k: results, job_alerts=lambda: [], traces=[], track=lambda: [],
-        follow_up=lambda: []))
+        follow_up=lambda: [], db=Database(tmp_path / "t.db"), profile=None, scraper=None, extractor=None))
     sent = []
     monkeypatch.setattr(main, "send_summary", lambda text, settings: sent.append(text))
 
@@ -2021,16 +2022,29 @@ BRIEF = {
 }
 
 
-def test_a_reply_change_names_the_sender_but_never_the_address(tmp_path: Path):
+def _replied(db, domain="useshiplog.com", who="Ada"):
+    _drafted(db, domain, "d-" + domain)
+    db.set_stage(domain, "replied", "mailbox", "2026-11-17T09:00:00+00:00", who=who)
+
+
+def test_a_reply_names_the_sender_but_never_the_address(tmp_path: Path):
     from src.tracker import _sender_name, update_stages
 
     db = Database(tmp_path / "t.db")
     _drafted(db, "useshiplog.com", "d1")
     db.set_stage("useshiplog.com", "sent", "mailbox", "2026-11-06T11:51:00+00:00")
-    box = _FakeMailbox(replies={"useshiplog.com": [_reply('"Ada Lovelace" <ada@useshiplog.com>')]})
+    box = _FakeMailbox(replies={"useshiplog.com": [_reply("=?UTF-8?Q?Jos=C3=A9_Ada?= <ada@useshiplog.com>")]})
     (change,) = update_stages(db, box, can_read=True)
-    assert (change.stage, change.who, change.at) == ("replied", "Ada Lovelace", "2026-11-21T09:00:00+00:00")
+    assert (change.stage, change.who, change.at) == ("replied", "José Ada", "2026-11-21T09:00:00+00:00")
+    assert db.reply_alerts_due()[0]["replied_by"] == "José Ada"  # kept for the alert, decoded
     assert _sender_name({"from": "ada@useshiplog.com"}) == ""  # no display name: nothing, not the address
+    assert _sender_name({"from": "=?UTF-8?Q?a=40b.com?= <a@b.com>"}) == ""  # an encoded address too
+    assert _sender_name({"from": "=?UTF-8?B?a?= <ada@useshiplog.com>"}) == "=?UTF-8?B?a?="  # bad Base64: as it came
+
+    db.set_stage("useshiplog.com", "sent", "mailbox", "2026-11-06T11:51:00+00:00")  # check again, malformed name
+    box = _FakeMailbox(replies={"useshiplog.com": [_reply("=?UTF-8?B?a?= <ada@useshiplog.com>")]})
+    assert [c.stage for c in update_stages(db, box, can_read=True)] == ["replied"]  # still recorded
+    assert db.drafted()[0]["replied_by"] == "Jos\u00e9 Ada"  # the first sender is kept, not overwritten
 
 
 def _brief_tools(replies, pages=None):
@@ -2053,58 +2067,201 @@ def _brief_tools(replies, pages=None):
     return (lambda: (scraper, extractor)), seen
 
 
-def test_reply_brief_is_written_once_and_safe_to_post(tmp_path: Path):
-    from src.briefs import CompanyBrief, brief_new_replies, write_files
-    from src.tracker import Change
+def test_reply_alert_is_sent_once_with_a_safe_brief(tmp_path: Path):
+    from src.briefs import CompanyBrief, deliver_replies
 
     db = Database(tmp_path / "t.db")
-    _drafted(db, "useshiplog.com", "d1")
+    _replied(db)
     tools, seen = _brief_tools(iter([BRIEF]))
-    change = Change("useshiplog.com", "Shiplog", "replied", "2026-11-17T09:00:00+00:00", "Ada")
-    (rb,) = brief_new_replies(db, [change, Change("other.dev", "Other", "sent", "2026-11-17")], tools, PROFILE)
+    sent = []
+    (rb,) = deliver_replies(db, tools, lambda: PROFILE, tmp_path / "briefs", lambda b: sent.append(b) or True)
+    assert sent == [rb]
     assert seen[0]["config"].response_schema is CompanyBrief  # the brief's own schema, not the extractor's
     assert "ExampleScan" in seen[0]["contents"]  # your projects are given to pick from
 
     text = rb.text()
-    assert text.startswith("seedreach: Ada at Shiplog replied (17 Nov).")
+    assert text.startswith("seedreach: Ada at Useshiplog replied (17 Nov).")
     assert "What they build:\nShiplog turns merged pull requests into customer-facing" in text  # no markdown
     assert "- REST API and a TypeScript SDK" in text and "\n- \n" not in text  # empty items dropped
     assert "1. How do you group commits?" in text and "5. Q5?" in text
     assert "ada@useshiplog.com" not in text and "(address left out)" in text  # an address from the site
 
-    md = rb.markdown()
-    assert md.startswith("# Ada at Shiplog replied\n") and "### Questions to ask" in md
+    md = (tmp_path / "briefs" / "useshiplog.com.md").read_text(encoding="utf-8")
+    assert md == rb.markdown() and md.startswith("# Ada at Useshiplog replied\n") and "### Questions to ask" in md
     assert "@" not in md and "&#64;vercel" in md  # nobody on GitHub gets mentioned by the brief
     assert "python main.py mark useshiplog.com interview" in md
 
-    assert db.briefed("useshiplog.com")
-    assert brief_new_replies(db, [change], tools, PROFILE) == []  # once per company: no second LLM call
-    (path,) = write_files([rb], tmp_path / "briefs")
-    assert path.name == "useshiplog.com.md" and path.read_text(encoding="utf-8") == md
+    assert CompanyBrief.model_validate_json(db.drafted()[0]["reply_brief"]) == rb.brief  # saved as JSON
+    assert deliver_replies(db, tools, lambda: PROFILE, None, lambda b: True) == []  # once: no second alert or call
+    assert len(seen) == 1
 
 
-def test_a_reply_is_reported_even_when_no_brief_can_be_written(tmp_path: Path):
-    from src.briefs import brief_new_replies
+def test_an_alert_goes_out_without_a_brief_and_the_brief_is_not_saved(tmp_path: Path):
+    from src.briefs import deliver_replies
     from src.intelligence.extractor import ExtractionError
-    from src.tracker import Change
+    from src.profile import ProfileError
 
     db = Database(tmp_path / "t.db")
-    for d in ("a.dev", "b.dev"):
-        _drafted(db, d, d)
-    changes = [Change(d, d.split(".")[0].title(), "replied", "2026-11-17T09:00:00+00:00") for d in ("a.dev", "b.dev")]
+    _replied(db, "a.dev", who="")
+    _replied(db, "b.dev")
 
     def no_key():
         raise ExtractionError("GEMINI_API_KEY is not set")
 
-    found = brief_new_replies(db, changes, no_key, PROFILE)
-    assert [b.title for b in found] == ["A replied", "B replied"] and all(b.brief is None for b in found)
-    assert "No brief this time" in found[0].text() and db.briefed("a.dev")
+    def no_profile():
+        raise ProfileError("profile.json not found")
+
+    sent = []
+
+    def send(b):
+        sent.append(b)
+        return True
+
+    found = deliver_replies(db, no_key, lambda: PROFILE, None, send)
+    assert [b.title for b in found] == ["A replied", "Ada at B replied"] and all(b.brief is None for b in found)
+    assert "No brief this time" in found[0].text() and "python main.py brief a.dev" in found[0].text()
+    assert db.reply_alerts_due() == [] and all(r["reply_brief"] is None for r in db.drafted())  # nothing cached
+
+    _replied(db, "c.dev")
+    tools, seen = _brief_tools(iter([BRIEF]))
+    (rb,) = deliver_replies(db, tools, no_profile, None, send)  # profile.json broken: still alerted
+    assert rb.brief is None and seen == [] and len(sent) == 3
+
+
+def test_an_alert_that_cannot_be_written_is_tried_again(tmp_path: Path):
+    from src.briefs import deliver_replies
+
+    db = Database(tmp_path / "t.db")
+    _replied(db)
+    tools, seen = _brief_tools(iter([BRIEF]))
+    blocked = tmp_path / "not-a-folder"
+    blocked.write_text("a file where the folder should be", encoding="utf-8")
+    sent = []
+
+    def send(b):
+        sent.append(b)
+        return True
+
+    assert deliver_replies(db, tools, lambda: PROFILE, blocked, send) == []  # no exception
+    assert sent == [] and len(db.reply_alerts_due()) == 1  # nothing sent, still due
+
+    (rb,) = deliver_replies(db, tools, lambda: PROFILE, tmp_path / "briefs", send)
+    assert sent == [rb] and rb.brief is not None and len(seen) == 1  # the saved brief, no second LLM call
+    assert (tmp_path / "briefs" / "useshiplog.com.md").exists()
+
+
+def test_an_alert_that_reached_nowhere_stays_due(tmp_path: Path):
+    from src.briefs import deliver_replies
+
+    db = Database(tmp_path / "t.db")
+    _replied(db)
+    tools, _ = _brief_tools(iter([BRIEF]))
+
+    def broken(b):
+        raise RuntimeError("notifier crashed")
+
+    assert deliver_replies(db, tools, lambda: PROFILE, None, lambda b: False) == []  # Telegram/Discord all failed
+    assert deliver_replies(db, tools, lambda: PROFILE, None, broken) == []
+    assert len(db.reply_alerts_due()) == 1  # still due: tried again next run
+    (rb,) = deliver_replies(db, tools, lambda: PROFILE, tmp_path / "b", lambda b: False)
+    assert db.reply_alerts_due() == []  # the file reached the GitHub issue step, which retries on its own
+
+
+def test_one_failed_alert_doesnt_stop_the_others(tmp_path: Path):
+    from src.briefs import deliver_replies
+
+    db = Database(tmp_path / "t.db")
+    _drafted(db, "a.dev", "d-a")
+    db.set_stage("a.dev", "replied", "mailbox", "2026-11-16T09:00:00+00:00", who="Ada")  # older: tried first
+    _replied(db, "b.dev")
+    tools, _ = _brief_tools(iter([BRIEF] * 4))
+
+    folder = tmp_path / "briefs"
+    (folder / "a.dev.md").mkdir(parents=True)  # a.dev's file can't be written; b.dev's can
+    (rb,) = deliver_replies(db, tools, lambda: PROFILE, folder, lambda b: True)
+    assert rb.domain == "b.dev" and (folder / "b.dev.md").is_file()
+    assert [r["domain"] for r in db.reply_alerts_due()] == ["a.dev"]  # only the failed one stays due
+
+    _replied(db, "c.dev")  # no folder: a.dev's send fails, c.dev's works
+    (rb,) = deliver_replies(db, tools, lambda: PROFILE, None, lambda b: b.domain != "a.dev")
+    assert rb.domain == "c.dev" and [r["domain"] for r in db.reply_alerts_due()] == ["a.dev"]
+
+
+def test_send_alert_counts_only_a_channel_that_took_it(monkeypatch: pytest.MonkeyPatch):
+    from rich.console import Console
+
+    import main
+    from src.briefs import ReplyBrief
+
+    rb = ReplyBrief("acme.com", "Acme", "Ada", "2026-11-17T09:00:00+00:00", None)
+    monkeypatch.setattr(main, "console", Console(width=120, color_system=None))
+    on = Settings(_env_file=None, telegram_bot_token="t", telegram_chat_id="42")
+    for settings, worked, expected in ((on, [], False), (on, ["Telegram"], True),
+                                       (Settings(_env_file=None), [], True)):  # nothing set up: printing counts
+        monkeypatch.setattr(main, "get_settings", lambda s=settings: s)
+        monkeypatch.setattr(main, "send_summary", lambda text, s, w=worked: w)
+        assert main._send_alert(rb) is expected
+
+
+def test_a_brief_needs_five_questions_and_stays_short():
+    from types import SimpleNamespace as NS
+
+    from pydantic import ValidationError
+
+    from src.briefs import CompanyBrief
+    from src.intelligence.extractor import Extractor
+
+    for bad in (dict(BRIEF, questions=[]), dict(BRIEF, questions=["  ", "*", "Q?", "Q?", "Q?"]),
+                dict(BRIEF, what_they_build="**"), dict(BRIEF, recent=["x" * 301])):
+        with pytest.raises(ValidationError):
+            CompanyBrief.model_validate(bad)
+    big = CompanyBrief.model_validate(dict(BRIEF, questions=[f"Q{i}?" for i in range(8)],
+                                           stack_signals=[f"s{i}" for i in range(9)], recent=["a", "b", "c", "d"]))
+    assert (len(big.questions), len(big.stack_signals), len(big.recent)) == (5, 5, 3)
+
+    replies = iter([NS(text=json.dumps(dict(BRIEF, questions=[]))), NS(text=json.dumps(BRIEF))])
+    ex = Extractor(Settings(llm_provider="gemini"), client=NS(models=NS(generate_content=lambda **kw: next(replies))))
+    from src.briefs import SYSTEM_PROMPT, TOOL_NAME
+    assert len(ex.ask("x", SYSTEM_PROMPT, CompanyBrief, TOOL_NAME).questions) == 5  # asked again, not saved empty
+
+
+def test_migration_5_doesnt_resend_old_replies(tmp_path: Path):
+    import sqlite3
+
+    from src.db import MIGRATIONS, SCHEMA
+
+    path = tmp_path / "v4.db"
+    with sqlite3.connect(path) as conn:  # a database as #98 left it: migrations 1-4 only
+        conn.executescript(SCHEMA)
+        for steps in MIGRATIONS[:4]:
+            for sql in steps:
+                conn.execute(sql)
+        conn.execute("PRAGMA user_version = 4")
+        conn.execute("INSERT INTO companies (domain, url, source, status, company_name, founder_email, created_at, "
+                     "updated_at, stage, replied_at, reply_brief, briefed_at) VALUES ('old.dev', 'https://old.dev', "
+                     "'hn', 'drafted', 'Old', 'ada@old.dev', '2026-11-01T00:00:00+00:00', '2026-11-01T00:00:00+00:00', "
+                     "'replied', '2026-11-10T00:00:00+00:00', '# Ada at Old replied', '2026-11-10T01:00:00+00:00')")
+        conn.execute("INSERT INTO companies (domain, url, source, status, company_name, founder_email, created_at, "
+                     "updated_at, stage, sent_at) VALUES ('quiet.dev', 'https://quiet.dev', 'hn', 'drafted', 'Quiet', "
+                     "'ada@quiet.dev', '2026-11-01T00:00:00+00:00', '2026-11-01T00:00:00+00:00', 'sent', "
+                     "'2026-11-02T00:00:00+00:00')")
+    db = Database(path)  # opening it runs migration 5
+    with sqlite3.connect(path) as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(companies)")}
+    assert {"replied_by", "reply_alerted_at"} <= cols
+    assert db.reply_alerts_due() == []  # a reply from before the upgrade is not news
+    rows = {r["domain"]: r for r in db.drafted()}
+    assert rows["old.dev"]["reply_brief"] is None  # the old Markdown format is cleared, to be written again
+
+    db.set_stage("quiet.dev", "replied", "mailbox", "2026-11-21T09:00:00+00:00", who="Bo")  # a reply after it
+    assert [r["domain"] for r in db.reply_alerts_due()] == ["quiet.dev"]
 
 
 def test_notify_cuts_long_messages_to_each_apps_limit():
     import httpx
 
-    from src.notify import DISCORD_LIMIT, TELEGRAM_LIMIT, send_summary
+    from src.notify import DISCORD_LIMIT, TELEGRAM_LIMIT, _fit, _units, send_summary
 
     posted = {}
 
@@ -2117,13 +2274,28 @@ def test_notify_cuts_long_messages_to_each_apps_limit():
     long = "\n".join(f"line {i} " + "x" * 50 for i in range(200))
     assert send_summary(long, settings, httpx.Client(transport=httpx.MockTransport(handler))) == ["Telegram", "Discord"]
     tg, dc = posted["api.telegram.org"]["text"], posted["discord.test"]["content"]
-    assert len(tg) <= TELEGRAM_LIMIT and len(dc) <= DISCORD_LIMIT
-    assert tg.endswith("(cut to fit this app)") and "\nline" in tg and long.startswith(tg.rsplit("\n", 2)[0])
+    assert _units(tg) <= TELEGRAM_LIMIT and _units(dc) <= DISCORD_LIMIT
+    assert tg.endswith("(cut to fit this app)") and long.startswith(tg.rsplit("\n", 2)[0])
     assert send_summary("short", settings, httpx.Client(transport=httpx.MockTransport(handler)))
     assert posted["api.telegram.org"]["text"] == "short"
 
+    rocket = "\U0001F680"  # 1 character, 2 UTF-16 units
+    for count in (1001, 2049):  # under each app's limit in characters, over it in UTF-16 units (Discord, Telegram)
+        assert send_summary(rocket * count, settings, httpx.Client(transport=httpx.MockTransport(handler)))
+        tg, dc = posted["api.telegram.org"]["text"], posted["discord.test"]["content"]
+        assert _units(tg) <= TELEGRAM_LIMIT and _units(dc) <= DISCORD_LIMIT
+        assert dc.endswith("(cut to fit this app)")
+        assert tg.endswith("(cut to fit this app)") == (count == 2049)
 
-def test_cli_sends_the_brief_and_brief_shows_it(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    emoji = rocket * 1001
+    cut = _fit(emoji, DISCORD_LIMIT)
+    assert _units(cut) <= DISCORD_LIMIT and cut.endswith("(cut to fit this app)")
+    assert cut.replace("\n(cut to fit this app)", "") == "\U0001F680" * len(cut.split("\n")[0])  # whole characters
+
+
+def test_run_and_track_send_reply_alerts_and_brief_shows_them(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from types import SimpleNamespace as NS
+
     from rich.console import Console
     from typer.testing import CliRunner
 
@@ -2131,23 +2303,57 @@ def test_cli_sends_the_brief_and_brief_shows_it(tmp_path: Path, monkeypatch: pyt
     from src.tracker import Change
 
     db = Database(tmp_path / "t.db")
-    _drafted(db, "useshiplog.com", "d1")
+    for d in ("useshiplog.com", "acme.com"):
+        _drafted(db, d, "d-" + d)
     monkeypatch.setattr(main, "_db", lambda: db)
     monkeypatch.setattr(main, "console", Console(width=200, color_system=None))
     sent = []
-    monkeypatch.setattr(main, "send_summary", lambda text, settings: sent.append(text))
-    tools, _ = _brief_tools(iter([BRIEF, dict(BRIEF, what_they_build="Fresh take.")]))
-
-    runner = CliRunner()
-    assert runner.invoke(main.app, ["brief", "nodraft.dev"]).exit_code == 1
-    change = Change("useshiplog.com", "Shiplog", "replied", "2026-11-17T09:00:00+00:00", "Ada")
-    main._reply_briefs(db, [change], PROFILE, tools, tmp_path / "briefs")
-    assert len(sent) == 1 and sent[0].startswith("seedreach: Ada at Shiplog replied")
-    assert (tmp_path / "briefs" / "useshiplog.com.md").exists()
-
-    out = runner.invoke(main.app, ["brief", "https://useshiplog.com/"])
-    assert out.exit_code == 0 and "# Ada at Shiplog replied" in out.output  # the saved brief, no LLM call
+    monkeypatch.setattr(main, "send_summary", lambda text, settings: sent.append(text) or ["Telegram"])
+    tools, seen = _brief_tools(iter([BRIEF, BRIEF, BRIEF, dict(BRIEF, what_they_build="Fresh take.")]))
     monkeypatch.setattr(main, "_brief_tools", tools)
     monkeypatch.setattr(main, "load_profile", lambda: PROFILE)
+    runner = CliRunner()
+
+    # `track`: the mailbox shows a reply; the alert is sent and written for the GitHub issue
+    def tracked(db_, gmail, can_read):
+        db_.set_stage("useshiplog.com", "replied", "mailbox", "2026-11-17T09:00:00+00:00", who="Ada")
+        return [Change("useshiplog.com", "Shiplog", "replied", "2026-11-17T09:00:00+00:00", "Ada")]
+
+    monkeypatch.setattr(main, "token_can_read", lambda path: True)
+    monkeypatch.setattr(main, "GmailDraftClient", lambda *a, **k: NS(ensure_authenticated=lambda: None))
+    monkeypatch.setattr(main, "update_stages", tracked)
+    out = runner.invoke(main.app, ["track", "--briefs", str(tmp_path / "t-briefs")])
+    assert out.exit_code == 0, out.output
+    assert [s for s in sent if s.startswith("seedreach: Ada at Useshiplog replied")]
+    assert (tmp_path / "t-briefs" / "useshiplog.com.md").exists()
+
+    # a quiet `track` (nothing new in the mailbox) still sends an alert that's due, e.g. one that failed before
+    _drafted(db, "later.dev", "d-later")
+    db.set_stage("later.dev", "replied", "manual", "2026-11-17T10:00:00+00:00")  # due, but not a change now
+    monkeypatch.setattr(main, "update_stages", lambda db_, gmail, can_read: [])
+    out = runner.invoke(main.app, ["track", "--briefs", str(tmp_path / "t-briefs")])
+    assert out.exit_code == 0 and "No changes." in out.output, out.output
+    assert [s for s in sent if s.startswith("seedreach: Later replied")]
+    assert (tmp_path / "t-briefs" / "later.dev.md").exists()
+
+    # `run`: the pipeline's tracker sees another reply; the same delivery happens after it
+    def pipe_track():
+        db.set_stage("acme.com", "replied", "mailbox", "2026-11-18T09:00:00+00:00", who="Bob")
+        return []
+
+    scraper, extractor = tools()
+    monkeypatch.setattr(main, "_pipeline", lambda db_, dry_run, **kw: NS(
+        run=lambda *a, **k: [], job_alerts=lambda: [], traces=[], track=pipe_track, follow_up=lambda: [],
+        db=db, profile=PROFILE, scraper=scraper, extractor=extractor))
+    out = runner.invoke(main.app, ["run", "--briefs", str(tmp_path / "r-briefs")])
+    assert out.exit_code == 0, out.output
+    assert [s for s in sent if s.startswith("seedreach: Bob at Acme replied")]
+    assert (tmp_path / "r-briefs" / "acme.com.md").exists() and db.reply_alerts_due() == []
+
+    # `brief`: the saved brief without an LLM call, then a fresh one with --new
+    assert runner.invoke(main.app, ["brief", "nodraft.dev"]).exit_code == 1
+    calls = len(seen)
+    out = runner.invoke(main.app, ["brief", "https://useshiplog.com/"])
+    assert out.exit_code == 0 and "Ada at Useshiplog replied" in out.output and len(seen) == calls
     out = runner.invoke(main.app, ["brief", "useshiplog.com", "--new"])
     assert out.exit_code == 0 and "Fresh take." in out.output

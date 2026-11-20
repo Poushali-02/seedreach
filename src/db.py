@@ -93,6 +93,15 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "ALTER TABLE companies ADD COLUMN reply_brief TEXT",
         "ALTER TABLE companies ADD COLUMN briefed_at TEXT",
     ),
+    # 5. reply alerts that retry: who replied, and when the alert went out (NULL = still to send). Replies seen
+    # before this are counted as alerted, so upgrading doesn't send old news; a brief saved in the first
+    # (Markdown) format is cleared, since briefs are now saved as JSON and only when generation worked.
+    (
+        "ALTER TABLE companies ADD COLUMN replied_by TEXT",
+        "ALTER TABLE companies ADD COLUMN reply_alerted_at TEXT",
+        "UPDATE companies SET reply_alerted_at = COALESCE(briefed_at, replied_at) WHERE replied_at IS NOT NULL",
+        "UPDATE companies SET reply_brief = NULL, briefed_at = NULL WHERE reply_brief NOT LIKE '{%'",
+    ),
 )
 
 # After the draft, in order. "draft gone" = the draft left Drafts but no sent copy was found (no read access,
@@ -295,17 +304,19 @@ class Database:
                 "ORDER BY updated_at",
             ).fetchall()
 
-    def set_stage(self, domain: str, stage: str, source: str, at: Optional[str] = None) -> bool:
-        """Record a drafted company's stage; `at` is when it happened (default now). False if not drafted."""
+    def set_stage(self, domain: str, stage: str, source: str, at: Optional[str] = None, who: str = "") -> bool:
+        """Record a drafted company's stage; `at` is when it happened (default now), `who` the sender's name
+        for a reply. False if not drafted."""
         if stage not in STAGES:
             raise ValueError(f"Unknown stage {stage!r}; choose from: {', '.join(STAGES)}")
         at = at or _now()
-        extra = {"sent": ", sent_at = COALESCE(sent_at, :at)", "replied": ", replied_at = COALESCE(replied_at, :at)"}
+        extra = {"sent": ", sent_at = COALESCE(sent_at, :at)",
+                 "replied": ", replied_at = COALESCE(replied_at, :at), replied_by = COALESCE(replied_by, NULLIF(:who, ''))"}
         with self._conn() as conn:
             cur = conn.execute(
                 "UPDATE companies SET stage = :stage, stage_source = :source, stage_at = :at"
                 + extra.get(stage, "") + " WHERE domain = :domain AND status = 'drafted'",
-                {"stage": stage, "source": source, "at": at, "domain": domain},
+                {"stage": stage, "source": source, "at": at, "domain": domain, "who": who},
             )
         return cur.rowcount == 1
 
@@ -333,7 +344,7 @@ class Database:
             return conn.execute(
                 "SELECT domain, company_name, founder_name, founder_email, email_source, "
                 "COALESCE(stage, 'drafted') AS stage, stage_source, updated_at AS drafted_at, sent_at, "
-                "replied_at, stage_at, followed_up_at, reply_brief FROM companies WHERE status = 'drafted' "
+                "replied_at, stage_at, followed_up_at, reply_brief, replied_by FROM companies WHERE status = 'drafted' "
                 "ORDER BY updated_at").fetchall()
 
     # ---- follow-ups (#17) ----------------------------------------------
@@ -364,10 +375,17 @@ class Database:
             return conn.execute(sql + " ORDER BY updated_at DESC LIMIT ?", (limit,)).fetchall()
 
     # ---- reply briefs (#16) --------------------------------------------
-    def briefed(self, domain: str) -> bool:
+    def reply_alerts_due(self) -> list[sqlite3.Row]:
+        """Drafted companies with a reply (seen or marked) whose alert hasn't gone out, oldest reply first."""
         with self._conn() as conn:
-            row = conn.execute("SELECT briefed_at FROM companies WHERE domain = ?", (domain,)).fetchone()
-        return bool(row and row["briefed_at"])
+            return conn.execute(
+                "SELECT domain, company_name, replied_at, replied_by, reply_brief FROM companies "
+                "WHERE status = 'drafted' AND replied_at IS NOT NULL AND reply_alerted_at IS NULL "
+                "ORDER BY replied_at").fetchall()
+
+    def mark_reply_alerted(self, domain: str) -> None:
+        with self._conn() as conn:
+            conn.execute("UPDATE companies SET reply_alerted_at = ? WHERE domain = ?", (_now(), domain))
 
     def company_url(self, domain: str) -> str:
         with self._conn() as conn:
@@ -375,6 +393,7 @@ class Database:
         return (row["url"] if row else "") or f"https://{domain}"
 
     def save_brief(self, domain: str, text: str) -> None:
+        """`text`: the brief as JSON (CompanyBrief). Saved only when generating it worked."""
         with self._conn() as conn:
             conn.execute("UPDATE companies SET reply_brief = ?, briefed_at = ? WHERE domain = ?",
                          (text, _now(), domain))

@@ -229,8 +229,16 @@ It reaches you right away:
 - **Telegram or Discord**, if you set them up (see "Run it on a schedule"), as one message.
 - **A new GitHub issue** in your runner repo, titled e.g. *Ada at Shiplog replied*, which @-mentions
   you so the GitHub mobile app notifies you. The scheduled-runs template checks for replies every 2 hours
-  during the day, not just once a day.
+  from 09:30 to 21:30 IST, and once more with the 09:00 daily run. If the issue can't be opened, it's
+  tried again on the next run.
 - On your computer, `python main.py brief <domain>` shows it again; `--new` writes a fresh one.
+
+If the brief can't be written (the site is down or the LLM fails; with `track`, also no LLM key or an
+unreadable `profile.json`), the alert still goes out, saying so, and `python main.py brief <domain>` writes
+the brief later. `run` needs the key and `profile.json` to start at all, so it sends nothing without them. An alert is tried
+again on the next run until it reaches you somewhere: its GitHub issue file is written (the issue itself is
+retried until it opens), or Telegram/Discord accepted it. If you have neither set up, printing it in the
+terminal counts.
 
 Each company gets one brief. It's built from the company's public website and your profile only: seedreach
 never reads the reply itself, and the brief contains no email addresses. It never answers for you, either:
@@ -460,7 +468,8 @@ means no comment.
 
 **When a founder replies**, a separate new issue is opened with the company brief (see "When a founder
 replies" above), and it @-mentions you too. Besides the daily run, the template runs `track` alone every 2
-hours from 09:30 to 21:30 IST, so a reply reaches you within about 2 hours. Each check takes a minute or
+hours from 09:30 to 21:30 IST. A reply during that time reaches you within about 2 hours; one that comes
+in after the 21:30 check waits until the 09:00 run next morning (up to about 11.5 hours). Each check takes a minute or
 two, about 400 of the 2,000 free Actions minutes a month for a private repo; delete its `cron` line to check
 once a day. Seeing replies needs a `GMAIL_TOKEN` with read access (`JOB_ALERTS=1` at sign-in gives it).
 
