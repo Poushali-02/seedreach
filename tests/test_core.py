@@ -2167,6 +2167,26 @@ def test_an_alert_that_reached_nowhere_stays_due(tmp_path: Path):
     assert db.reply_alerts_due() == []  # the file reached the GitHub issue step, which retries on its own
 
 
+def test_one_failed_alert_doesnt_stop_the_others(tmp_path: Path):
+    from src.briefs import deliver_replies
+
+    db = Database(tmp_path / "t.db")
+    _drafted(db, "a.dev", "d-a")
+    db.set_stage("a.dev", "replied", "mailbox", "2026-11-16T09:00:00+00:00", who="Ada")  # older: tried first
+    _replied(db, "b.dev")
+    tools, _ = _brief_tools(iter([BRIEF] * 4))
+
+    folder = tmp_path / "briefs"
+    (folder / "a.dev.md").mkdir(parents=True)  # a.dev's file can't be written; b.dev's can
+    (rb,) = deliver_replies(db, tools, lambda: PROFILE, folder, lambda b: True)
+    assert rb.domain == "b.dev" and (folder / "b.dev.md").is_file()
+    assert [r["domain"] for r in db.reply_alerts_due()] == ["a.dev"]  # only the failed one stays due
+
+    _replied(db, "c.dev")  # no folder: a.dev's send fails, c.dev's works
+    (rb,) = deliver_replies(db, tools, lambda: PROFILE, None, lambda b: b.domain != "a.dev")
+    assert rb.domain == "c.dev" and [r["domain"] for r in db.reply_alerts_due()] == ["a.dev"]
+
+
 def test_send_alert_counts_only_a_channel_that_took_it(monkeypatch: pytest.MonkeyPatch):
     from rich.console import Console
 
