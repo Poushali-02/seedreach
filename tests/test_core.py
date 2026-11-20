@@ -1549,9 +1549,13 @@ def test_cli_run_sends_summary_even_when_every_attempt_failed(monkeypatch: pytes
 class _FakeMailbox:
     """Answers the tracker's two questions from dicts: is the draft still there, and what matches a search."""
 
-    def __init__(self, drafts=(), sent=None, replies=None, bounces=None, broken=()):
+    def __init__(self, drafts=(), sent=None, replies=None, bounces=None, broken=(), answered=()):
         self.drafts, self.broken = set(drafts), set(broken)
         self.sent, self.replies, self.bounces = sent or {}, replies or {}, bounces or {}  # replies: domain -> headers
+        self.answered = set(answered)  # Gmail conversations (thread ids) you wrote in
+
+    def you_answered(self, thread_id):
+        return thread_id in self.answered
 
     def draft_exists(self, draft_id):
         if draft_id in self.broken:
@@ -2009,3 +2013,158 @@ def test_cli_linkedin_and_digest_show_the_note(tmp_path: Path, monkeypatch: pyte
     assert "@" not in digest  # still no email address
     assert build_digest([dataclasses.replace(drafted, outcome="skipped", detail="no founder email found")]).startswith(
         "### LinkedIn notes")  # no address at all: the note is the only way in, so it's still listed
+
+
+# ---- reply briefs (#16) ----------------------------------------------------
+BRIEF = {
+    "what_they_build": "Shiplog turns merged pull requests into **customer-facing** changelogs for dev teams.",
+    "stack_signals": ["GitHub App", "REST API and a TypeScript SDK", ""],
+    "recent": ["Monorepo support, launched 3 Nov 2026"],
+    "project_angle": "ExampleScan reads package manifests, close to how Shiplog maps changes to packages.",
+    "questions": ["How do you group commits?", "Write to ada@useshiplog.com about @vercel?", "Q3?", "Q4?", "Q5?"],
+}
+
+
+def test_a_new_email_you_answered_counts_as_a_reply(tmp_path: Path):
+    from datetime import datetime, timezone
+
+    from src.tracker import update_stages
+
+    db = Database(tmp_path / "t.db")
+    for domain, draft in (("useshiplog.com", "d1"), ("acme.com", "d2")):
+        _drafted(db, domain, draft)
+        db.set_stage(domain, "sent", "mailbox", "2026-11-06T11:51:00+00:00")
+    checking_in = _reply('"Ada Lovelace" <ada@useshiplog.com>', subject="Checking in from Shiplog",
+                         **{"thread-id": "t1"})
+    receipt = _reply("ada@acme.com", subject="Support Request Received", **{"thread-id": "t2"})
+    box = _FakeMailbox(replies={"useshiplog.com": [checking_in], "acme.com": [receipt]})
+    assert update_stages(db, box, can_read=True) == []  # a new email you never answered is not a reply
+
+    box.answered = {"t1", "t2"}  # you answered both; the receipt is still automatic mail
+    receipt["auto-submitted"] = "auto-replied"
+    (change,) = update_stages(db, box, can_read=True)
+    assert (change.domain, change.stage, change.who) == ("useshiplog.com", "replied", "Ada Lovelace")
+    assert change.at == "2026-11-21T09:00:00+00:00"
+
+    from src.tracker import _sender_name
+    assert _sender_name({"from": "ada@acme.com"}) == ""  # never the address: it goes to your phone
+
+
+def _brief_tools(replies, pages=None):
+    """A scraper that returns one page, and an Extractor whose fake Gemini answers from `replies`."""
+    from types import SimpleNamespace as NS
+
+    from src.intelligence.extractor import Extractor
+
+    seen = []
+
+    def generate_content(**kw):
+        seen.append(kw)
+        reply = next(replies)
+        if isinstance(reply, Exception):
+            raise reply
+        return NS(text=json.dumps(reply))
+
+    scraper = NS(fetch=lambda url: (pages or {}).get(url) or _page())
+    extractor = Extractor(Settings(llm_provider="gemini"), client=NS(models=NS(generate_content=generate_content)))
+    return (lambda: (scraper, extractor)), seen
+
+
+def test_reply_brief_is_written_once_and_safe_to_post(tmp_path: Path):
+    from src.briefs import CompanyBrief, brief_new_replies, write_files
+    from src.tracker import Change
+
+    db = Database(tmp_path / "t.db")
+    _drafted(db, "useshiplog.com", "d1")
+    tools, seen = _brief_tools(iter([BRIEF]))
+    change = Change("useshiplog.com", "Shiplog", "replied", "2026-11-17T09:00:00+00:00", "Ada")
+    (rb,) = brief_new_replies(db, [change, Change("other.dev", "Other", "sent", "2026-11-17")], tools, PROFILE)
+    assert seen[0]["config"].response_schema is CompanyBrief  # the brief's own schema, not the extractor's
+    assert "ExampleScan" in seen[0]["contents"]  # your projects are given to pick from
+
+    text = rb.text()
+    assert text.startswith("seedreach: Ada at Shiplog replied (17 Nov).")
+    assert "What they build:\nShiplog turns merged pull requests into customer-facing" in text  # no markdown
+    assert "- REST API and a TypeScript SDK" in text and "\n- \n" not in text  # empty items dropped
+    assert "1. How do you group commits?" in text and "5. Q5?" in text
+    assert "ada@useshiplog.com" not in text and "(address left out)" in text  # an address from the site
+
+    md = rb.markdown()
+    assert md.startswith("# Ada at Shiplog replied\n") and "### Questions to ask" in md
+    assert "@" not in md and "&#64;vercel" in md  # nobody on GitHub gets mentioned by the brief
+    assert "python main.py mark useshiplog.com interview" in md
+
+    assert db.briefed("useshiplog.com")
+    assert brief_new_replies(db, [change], tools, PROFILE) == []  # once per company: no second LLM call
+    (path,) = write_files([rb], tmp_path / "briefs")
+    assert path.name == "useshiplog.com.md" and path.read_text(encoding="utf-8") == md
+
+
+def test_a_reply_is_reported_even_when_no_brief_can_be_written(tmp_path: Path):
+    from src.briefs import brief_new_replies
+    from src.intelligence.extractor import ExtractionError
+    from src.tracker import Change
+
+    db = Database(tmp_path / "t.db")
+    for d in ("a.dev", "b.dev"):
+        _drafted(db, d, d)
+    changes = [Change(d, d.split(".")[0].title(), "replied", "2026-11-17T09:00:00+00:00") for d in ("a.dev", "b.dev")]
+
+    def no_key():
+        raise ExtractionError("GEMINI_API_KEY is not set")
+
+    found = brief_new_replies(db, changes, no_key, PROFILE)
+    assert [b.title for b in found] == ["A replied", "B replied"] and all(b.brief is None for b in found)
+    assert "No brief this time" in found[0].text() and db.briefed("a.dev")
+
+
+def test_notify_cuts_long_messages_to_each_apps_limit():
+    import httpx
+
+    from src.notify import DISCORD_LIMIT, TELEGRAM_LIMIT, send_summary
+
+    posted = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        posted[request.url.host] = json.loads(request.content)
+        return httpx.Response(200)
+
+    settings = Settings(_env_file=None, telegram_bot_token="t", telegram_chat_id="42",
+                        discord_webhook_url="https://discord.test/hook/x")
+    long = "\n".join(f"line {i} " + "x" * 50 for i in range(200))
+    assert send_summary(long, settings, httpx.Client(transport=httpx.MockTransport(handler))) == ["Telegram", "Discord"]
+    tg, dc = posted["api.telegram.org"]["text"], posted["discord.test"]["content"]
+    assert len(tg) <= TELEGRAM_LIMIT and len(dc) <= DISCORD_LIMIT
+    assert tg.endswith("(cut to fit this app)") and "\nline" in tg and long.startswith(tg.rsplit("\n", 2)[0])
+    assert send_summary("short", settings, httpx.Client(transport=httpx.MockTransport(handler)))
+    assert posted["api.telegram.org"]["text"] == "short"
+
+
+def test_cli_sends_the_brief_and_brief_shows_it(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from rich.console import Console
+    from typer.testing import CliRunner
+
+    import main
+    from src.tracker import Change
+
+    db = Database(tmp_path / "t.db")
+    _drafted(db, "useshiplog.com", "d1")
+    monkeypatch.setattr(main, "_db", lambda: db)
+    monkeypatch.setattr(main, "console", Console(width=200, color_system=None))
+    sent = []
+    monkeypatch.setattr(main, "send_summary", lambda text, settings: sent.append(text))
+    tools, _ = _brief_tools(iter([BRIEF, dict(BRIEF, what_they_build="Fresh take.")]))
+
+    runner = CliRunner()
+    assert runner.invoke(main.app, ["brief", "nodraft.dev"]).exit_code == 1
+    change = Change("useshiplog.com", "Shiplog", "replied", "2026-11-17T09:00:00+00:00", "Ada")
+    main._reply_briefs(db, [change], PROFILE, tools, tmp_path / "briefs")
+    assert len(sent) == 1 and sent[0].startswith("seedreach: Ada at Shiplog replied")
+    assert (tmp_path / "briefs" / "useshiplog.com.md").exists()
+
+    out = runner.invoke(main.app, ["brief", "https://useshiplog.com/"])
+    assert out.exit_code == 0 and "# Ada at Shiplog replied" in out.output  # the saved brief, no LLM call
+    monkeypatch.setattr(main, "_brief_tools", tools)
+    monkeypatch.setattr(main, "load_profile", lambda: PROFILE)
+    out = runner.invoke(main.app, ["brief", "useshiplog.com", "--new"])
+    assert out.exit_code == 0 and "Fresh take." in out.output

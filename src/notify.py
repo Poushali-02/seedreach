@@ -1,7 +1,8 @@
-"""Optional run summary to Telegram and/or Discord, so scheduled runs are easy to review later.
+"""Optional messages to Telegram and/or Discord: a one-line run summary, and a brief when a founder replies.
 
-The message holds company names and counts only: never addresses, draft text or skip reasons
-(some skip reasons contain an email address).
+The run summary holds company names and counts only: never addresses, draft text or skip reasons (some skip
+reasons contain an email address). A reply brief (src/briefs.py) holds the sender's name and what the
+company's public site says: no addresses and no email text.
 """
 
 from __future__ import annotations
@@ -18,6 +19,16 @@ from src.utils import display_name
 log = logging.getLogger(__name__)
 
 TELEGRAM_URL = "https://api.telegram.org/bot{token}/sendMessage"
+TELEGRAM_LIMIT, DISCORD_LIMIT = 4096, 2000  # characters per message; longer ones are refused
+
+
+def _fit(text: str, limit: int) -> str:
+    """`text`, cut at a line break to fit `limit` when it's longer, with a note that it was cut."""
+    if len(text) <= limit:
+        return text
+    note = "\n(cut to fit this app)"
+    head = text[: limit - len(note)]
+    return (head.rsplit("\n", 1)[0] if "\n" in head else head) + note
 
 
 def _name(result: Result) -> str:
@@ -58,9 +69,9 @@ def send_summary(text: str, settings: Settings, client: Optional[httpx.Client] =
     targets = []
     if settings.telegram_bot_token and settings.telegram_chat_id:
         targets.append(("Telegram", TELEGRAM_URL.format(token=settings.telegram_bot_token),
-                        {"chat_id": settings.telegram_chat_id, "text": text}))
+                        {"chat_id": settings.telegram_chat_id, "text": _fit(text, TELEGRAM_LIMIT)}))
     if settings.discord_webhook_url:
-        targets.append(("Discord", settings.discord_webhook_url, {"content": text}))
+        targets.append(("Discord", settings.discord_webhook_url, {"content": _fit(text, DISCORD_LIMIT)}))
     if not targets:
         return []
 
