@@ -1916,3 +1916,86 @@ def test_recent_alert_jobs_orders_equal_timestamps(tmp_path, monkeypatch):
 
     limited_rows = db.recent_alert_jobs(1)
     assert [row["company"] for row in limited_rows] == ["Second Labs"]
+
+
+# ---- LinkedIn note (#20) ---------------------------------------------------
+def test_linkedin_note_fits_the_limit_and_reads_as_sentences():
+    from src.outreach.generator import NOTE_ASK, generate_linkedin
+
+    li = generate_linkedin(_company("DevTools"), PROFILE)
+    assert li.note.startswith("Hi Ada, I'm ") and li.note.endswith(NOTE_ASK)
+    assert len(li.note) <= 200 and not re.search(r"[*#`]", li.note)
+    assert "(" not in li.note  # "(graduating 2028)"-style asides are dropped from the intro
+    assert "Shiplog" in li.note  # the opener, shortened to a full sentence
+
+    long_hook = ("I saw that Shiplog turns every merged pull request into a customer-facing changelog entry across "
+                 "dozens of monorepo packages, and I was curious how you keep entries stable when a release is "
+                 "reverted and re-applied")
+    li = generate_linkedin(_company("DevTools", personalized_hook=long_hook), PROFILE)
+    assert len(li.note) <= 200 and "I was curious" not in li.note  # cut at a clause, never mid-word
+    assert re.search(r"\w\. Would love to connect\.$", li.note)
+
+    roomy = generate_linkedin(_company("DevTools", personalized_hook=long_hook), PROFILE, limit=300)
+    assert 200 < len(roomy.note) <= 300 and "I was curious" in roomy.note  # Premium's limit keeps it all
+    tiny = generate_linkedin(_company("DevTools"), PROFILE, limit=60)
+    assert len(tiny.note) <= 60 and tiny.note.startswith("Hi Ada,")
+
+    assert generate_linkedin(_company("DevTools", founder_first_name=None), PROFILE) is None  # a note needs a person
+
+
+def test_linkedin_message_is_the_short_email_as_a_message():
+    from src.outreach.generator import generate_linkedin
+
+    msg = generate_linkedin(_company("DevTools"), PROFILE, role="Backend Intern").message
+    assert msg.startswith("Hi Ada, thanks for connecting!\n\n")
+    assert "Shiplog diffs release notes" in msg and "Backend Intern" in msg
+    assert "Best," not in msg and msg.rstrip().endswith(PROFILE.first_name)
+    assert not re.search(r"[*#`]", msg)
+
+
+def test_pipeline_keeps_linkedin_texts_for_real_runs_only(tmp_path: Path):
+    pipe = _traced_pipeline(tmp_path, "Shiplog was started by Ada.")
+    result = pipe.process("https://useshiplog.com", "hn")
+    assert result.outcome == "drafted" and result.linkedin.note.startswith("Hi Ada,")
+    (row,) = pipe.db.linkedin_texts("useshiplog.com")
+    assert row["linkedin_note"] == result.linkedin.note and "thanks for connecting" in row["linkedin_message"]
+
+    (tmp_path / "dry").mkdir()
+    dry = _traced_pipeline(tmp_path / "dry", "Shiplog was started by Ada.")
+    dry.dry_run = True
+    assert dry.process("https://useshiplog.com", "hn").linkedin is not None  # shown in the dry run...
+    assert dry.db.linkedin_texts() == []                                     # ...but never saved
+
+    (tmp_path / "off").mkdir()
+    off = _traced_pipeline(tmp_path / "off", "Shiplog was started by Ada.")
+    off.settings = Settings(linkedin_note_max=0)
+    assert off.process("https://useshiplog.com", "hn").linkedin is None
+
+
+def test_cli_linkedin_and_digest_show_the_note(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from rich.console import Console
+    from typer.testing import CliRunner
+
+    import main
+    from src.digest import build_digest
+    from src.outreach.generator import generate_linkedin
+    from src.pipeline import Result
+
+    db = Database(tmp_path / "t.db")
+    monkeypatch.setattr(main, "_db", lambda: db)
+    monkeypatch.setattr(main, "console", Console(width=200, color_system=None))
+    runner = CliRunner()
+    assert "No LinkedIn notes yet" in runner.invoke(main.app, ["linkedin"]).output
+
+    li = generate_linkedin(_company("DevTools"), PROFILE)
+    _drafted(db, "useshiplog.com", "d1")
+    db.save_linkedin("useshiplog.com", li.note, li.message)
+    listing = runner.invoke(main.app, ["linkedin"]).output
+    assert li.note[:40] in listing and "thanks for connecting" not in listing  # notes only in the list
+    one = runner.invoke(main.app, ["linkedin", "useshiplog.com"]).output
+    assert "After they accept" in one and "thanks for connecting" in one
+
+    reach = Result("useshiplog.com", "skipped", "needs contact: guessed ada@useshiplog.com, not verified",
+                   company="Shiplog", founder="Ada Lovelace", linkedin=li)
+    digest = build_digest([reach])
+    assert f"  > {li.note}" in digest and "@" not in digest  # the note, and still no email address

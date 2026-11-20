@@ -83,6 +83,11 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "ALTER TABLE companies ADD COLUMN followup_draft_id TEXT",
         "ALTER TABLE companies ADD COLUMN followed_up_at TEXT",
     ),
+    # 3. LinkedIn (#20): a connection note and an after-accept message, to paste by hand
+    (
+        "ALTER TABLE companies ADD COLUMN linkedin_note TEXT",
+        "ALTER TABLE companies ADD COLUMN linkedin_message TEXT",
+    ),
 )
 
 # After the draft, in order. "draft gone" = the draft left Drafts but no sent copy was found (no read access,
@@ -337,6 +342,21 @@ class Database:
                 "WHERE status = 'drafted' AND stage = 'sent' AND followed_up_at IS NULL AND sent_at <= ? "
                 "ORDER BY sent_at LIMIT ?", (sent_before, limit),
             ).fetchall()
+
+    # ---- LinkedIn (#20) ------------------------------------------------
+    def save_linkedin(self, domain: str, note: str, message: str) -> None:
+        with self._conn() as conn:
+            conn.execute("UPDATE companies SET linkedin_note = ?, linkedin_message = ? WHERE domain = ?",
+                         (note, message, domain))
+
+    def linkedin_texts(self, domain: str = "", limit: int = 10) -> list[sqlite3.Row]:
+        """Companies with a LinkedIn note, newest first; one company when `domain` is given."""
+        sql = ("SELECT domain, company_name, founder_name, status, reason, linkedin_note, linkedin_message "
+               "FROM companies WHERE linkedin_note IS NOT NULL")
+        with self._conn() as conn:
+            if domain:
+                return conn.execute(sql + " AND domain = ?", (domain,)).fetchall()
+            return conn.execute(sql + " ORDER BY updated_at DESC LIMIT ?", (limit,)).fetchall()
 
     def mark_followed_up(self, domain: str, draft_id: str) -> None:
         with self._conn() as conn:

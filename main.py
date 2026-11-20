@@ -9,6 +9,7 @@
     python main.py mark useshiplog.com interview
     python main.py export --csv tracker.csv
     python main.py followups --dry-run
+    python main.py linkedin
 
 Drafts are only ever saved to Gmail Drafts; nothing is sent automatically.
 """
@@ -71,6 +72,9 @@ def _report(result: Result) -> None:
     console.print(f"[{style}]{result.outcome.upper():9}[/{style}] {result.domain}{to}  [dim]{result.detail}[/dim]")
     if result.draft and "dry run" in result.detail:
         console.print(Panel(result.draft.body, title=f"Subject: {result.draft.subject}", expand=False))
+    if result.linkedin and result.outcome in ("drafted", "skipped") and "dry run" in result.detail:
+        console.print(Panel(escape(result.linkedin.note), expand=False,
+                            title=f"LinkedIn note ({len(result.linkedin.note)} characters)"))
 
 
 def _summary(results: list[Result], dry_run: bool) -> dict[str, int]:
@@ -324,6 +328,35 @@ def followups(
     if not done:
         console.print(f"No follow-ups due: nobody emailed {days}+ days ago is waiting without one. "
                       "(Run `python main.py track` first so recent sends and replies are known.)")
+
+
+@app.command()
+def linkedin(
+    domain: Optional[str] = typer.Argument(None, help="One company's website or domain; omit for the latest ones."),
+    limit: int = typer.Option(10, "--limit", "-n", help="How many companies to show without a domain."),
+) -> None:
+    """Show LinkedIn connection notes and after-accept messages to paste yourself (seedreach never uses LinkedIn)."""
+    try:
+        name = domain_of(normalize_url(domain)) if domain else ""
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(2)
+    rows = _db().linkedin_texts(name, limit)
+    if not rows:
+        console.print("No LinkedIn notes yet: they're written for companies whose site names a founder, "
+                      "on real runs (LINKEDIN_NOTE_MAX=0 turns them off).")
+        return
+    for r in rows:
+        company = r["company_name"] or r["domain"]
+        console.print(f"\n[bold]{escape(company)}[/bold] ({r['domain']}): {escape(r['founder_name'] or '-')}  "
+                      f"[dim]{linkedin_people_search(r['founder_name'], company)}[/dim]")
+        console.print(Panel(escape(r["linkedin_note"]), title=f"Connection note ({len(r['linkedin_note'])} characters)",
+                            expand=False))
+        if not domain:
+            continue  # the long message only for one company, to keep the list readable
+        console.print(Panel(escape(r["linkedin_message"]), title="After they accept", expand=False))
+    if not domain:
+        console.print("\n[dim]Add a domain to see the after-accept message too: python main.py linkedin <domain>[/dim]")
 
 
 EXPORT_COLUMNS = ("domain", "company_name", "founder_name", "founder_email", "email_source", "stage", "stage_source",

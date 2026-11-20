@@ -54,8 +54,11 @@ def build_digest(results: Iterable["Result"], *, dry_run: bool = False,
     if reach:
         lines.append("### Reach the founder on LinkedIn")
         lines.append("Only a generic or guessed address was found, so no draft was made.")
-        lines += [f"- {_name(r)}: {r.founder}, [find on LinkedIn]({linkedin_people_search(r.founder, r.company or '')})"
-                  f"{_size(r)}" for r in reach]
+        for r in reach:
+            lines.append(f"- {_name(r)}: {r.founder}, [find on LinkedIn]({linkedin_people_search(r.founder, r.company or '')})"
+                         f"{_size(r)}")
+            if r.linkedin:  # the note to paste when connecting (#20)
+                lines.append(f"  > {r.linkedin.note}")
         lines.append("")
     if drafts:
         lines.append("### Drafts to review in Gmail")
