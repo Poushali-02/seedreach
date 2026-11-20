@@ -88,6 +88,11 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "ALTER TABLE companies ADD COLUMN linkedin_note TEXT",
         "ALTER TABLE companies ADD COLUMN linkedin_message TEXT",
     ),
+    # 4. reply briefs (#16): one brief per company, sent when its reply is first seen
+    (
+        "ALTER TABLE companies ADD COLUMN reply_brief TEXT",
+        "ALTER TABLE companies ADD COLUMN briefed_at TEXT",
+    ),
 )
 
 # After the draft, in order. "draft gone" = the draft left Drafts but no sent copy was found (no read access,
@@ -328,7 +333,7 @@ class Database:
             return conn.execute(
                 "SELECT domain, company_name, founder_name, founder_email, email_source, "
                 "COALESCE(stage, 'drafted') AS stage, stage_source, updated_at AS drafted_at, sent_at, "
-                "replied_at, stage_at, followed_up_at FROM companies WHERE status = 'drafted' "
+                "replied_at, stage_at, followed_up_at, reply_brief FROM companies WHERE status = 'drafted' "
                 "ORDER BY updated_at").fetchall()
 
     # ---- follow-ups (#17) ----------------------------------------------
@@ -357,6 +362,22 @@ class Database:
             if domain:
                 return conn.execute(sql + " AND domain = ?", (domain,)).fetchall()
             return conn.execute(sql + " ORDER BY updated_at DESC LIMIT ?", (limit,)).fetchall()
+
+    # ---- reply briefs (#16) --------------------------------------------
+    def briefed(self, domain: str) -> bool:
+        with self._conn() as conn:
+            row = conn.execute("SELECT briefed_at FROM companies WHERE domain = ?", (domain,)).fetchone()
+        return bool(row and row["briefed_at"])
+
+    def company_url(self, domain: str) -> str:
+        with self._conn() as conn:
+            row = conn.execute("SELECT url FROM companies WHERE domain = ?", (domain,)).fetchone()
+        return (row["url"] if row else "") or f"https://{domain}"
+
+    def save_brief(self, domain: str, text: str) -> None:
+        with self._conn() as conn:
+            conn.execute("UPDATE companies SET reply_brief = ?, briefed_at = ? WHERE domain = ?",
+                         (text, _now(), domain))
 
     def mark_followed_up(self, domain: str, draft_id: str) -> None:
         with self._conn() as conn:

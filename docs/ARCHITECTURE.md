@@ -59,6 +59,11 @@ python main.py run --limit 5
    has it), a message in Sent to that address marks it `sent`, then a "Re:" message from the company's domain
    that isn't automatic or bulk mail `replied`, and a delivery failure naming it `bounced`. Stages set with `mark` (interview, offer, closed) are never
    changed. `track` runs the same check on its own.
+   **A new reply** gets one brief (`src/briefs.py`): the site is scraped again and `Extractor.ask` fills a
+   `CompanyBrief` schema (what they build, stack signals, recent news, your closest project, five
+   questions). It's sent with `send_summary` (cut to Telegram's and Discord's limits) and, with
+   `--briefs DIR`, written as `<domain>.md` for the scheduled-runs template to open a GitHub issue with.
+   Briefs never read email text; addresses and `@` mentions are taken out.
 6. **Follow-ups** (`src/followups.py`): for companies in the `sent` stage for `FOLLOW_UP_AFTER_DAYS`
    with no follow-up yet, one short draft (`generate_followup`) joins the first email's Gmail thread
    (the thread id, `In-Reply-To`/`References`, and the same subject), at most `FOLLOW_UPS_PER_RUN` a run.
@@ -86,13 +91,13 @@ A drafted company also has a **stage** (columns `stage`, `stage_source`, `stage_
 `PRAGMA user_version`, so older databases (the runner's included) catch up when opened. Migration 2 adds
 `followup_draft_id` and `followed_up_at`, which keep follow-ups to one per company. Migration 3 adds
 `linkedin_note` and `linkedin_message` (`generate_linkedin`, saved on real runs for companies with a named
-founder and shown by `linkedin`).
+founder and shown by `linkedin`). Migration 4 adds `reply_brief` and `briefed_at`, one brief per company.
 
 ## Where things live
 
 | Path | Responsibility |
 |---|---|
-| `main.py` | Typer CLI: `run`, `target`, `add-target`, `status`, `track`, `mark`, `export`, `followups`, `linkedin` |
+| `main.py` | Typer CLI: `run`, `target`, `add-target`, `status`, `track`, `brief`, `mark`, `export`, `followups`, `linkedin` |
 | `src/config.py` | Settings from `.env` (Pydantic `BaseSettings`) |
 | `src/profile.py` | Loads and validates `profile.json` (your details) |
 | `src/db.py` | SQLite: companies, statuses, event log, dedupe, run traces |
@@ -101,6 +106,7 @@ founder and shown by `linkedin`).
 | `src/digest.py` | The run digest (`run --digest`): roles to apply for, founders to reach, drafts to review |
 | `src/notify.py` | The optional one-line run summary to Telegram or Discord |
 | `src/tracker.py` | Where each drafted company stands after the draft (sent, replied, bounced), read from the mailbox |
+| `src/briefs.py` | The company brief sent when a founder replies (#16), to Telegram/Discord and a GitHub issue |
 | `src/followups.py` | One follow-up draft per quiet company, in the same Gmail thread as the first email |
 | `src/sourcing/` | Lead sources: one module per source |
 | `src/intelligence/` | `scraper.py` (HTML to text) and `extractor.py` (LLM to `CompanyProfile`) |

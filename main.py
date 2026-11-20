@@ -6,6 +6,7 @@
     python main.py add-target --csv companies.csv
     python main.py status
     python main.py track
+    python main.py brief useshiplog.com
     python main.py mark useshiplog.com interview
     python main.py export --csv tracker.csv
     python main.py followups --dry-run
@@ -28,10 +29,12 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
+from src.briefs import ReplyBrief, Tools, brief_new_replies, write_brief, write_files
 from src.config import get_settings
 from src.db import STAGES, Database
 from src.digest import build_digest
-from src.intelligence.extractor import ExtractionError
+from src.intelligence.extractor import ExtractionError, Extractor
+from src.intelligence.scraper import ScrapeError, Scraper
 from src.notify import build_summary, send_summary
 from src.outreach.gmail_client import GmailDraftClient, GmailError, token_can_read
 from src.pipeline import Pipeline, Result
@@ -52,6 +55,10 @@ def _setup(verbose: bool = typer.Option(False, "--verbose", "-v", help="Debug lo
     logging.basicConfig(level=level, format="%(message)s", handlers=[RichHandler(console=console, show_path=False)])
     for noisy in ("httpx", "httpcore", "googleapiclient", "urllib3", "anthropic", "google_genai"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
+
+
+BRIEFS_OPTION = typer.Option(None, "--briefs", help="Also write each new reply's company brief here, one "
+                             "<domain>.md each, e.g. for a scheduler to open a GitHub issue with.")
 
 
 def _db() -> Database:
@@ -122,6 +129,7 @@ def run(
                                        "skipping them. (Does not unskip previously skipped companies; use --force on target for that.)"),
     digest: Optional[Path] = typer.Option(None, "--digest", help="Also write a short Markdown summary here: roles "
                                           "to apply for, founders to reach, drafts to review (no email addresses)."),
+    briefs: Optional[Path] = BRIEFS_OPTION,
 ) -> None:
     """Fetch new leads, enrich them, and save drafts to Gmail."""
     pipe = _pipeline(_db(), dry_run, include_large=include_large)
@@ -136,7 +144,10 @@ def run(
         for a in alerts:
             console.print(f"  {a.company}: {a.role}{', ' + a.location if a.location else ''}  [dim]{a.apply_url}[/dim]")
     if not dry_run:
-        _print_changes(pipe.track())
+        changes = pipe.track()
+        _print_changes(changes)
+        if changes:
+            _reply_briefs(pipe.db, changes, pipe.profile, lambda: (pipe.scraper, pipe.extractor), briefs)
         _print_followups(pipe.follow_up())
     if digest is not None:  # written even when empty, so a scheduler can tell "nothing new" from "didn't run"
         digest.write_text(build_digest(results, dry_run=dry_run, alerts=alerts), encoding="utf-8")
@@ -234,6 +245,22 @@ def add_target(
     console.print(f"\nDone: {queued} queued, {already_tracked} already tracked, {invalid} invalid.")
 
 
+def _brief_tools() -> tuple[Scraper, Extractor]:
+    settings = get_settings()
+    return Scraper(settings), Extractor(settings)
+
+
+def _reply_briefs(db: Database, changes: list[Change], profile, tools: Tools, folder: Optional[Path]) -> list[ReplyBrief]:
+    """For each new reply: write the brief, print it, send it to Telegram/Discord, and save it to `folder`."""
+    found = brief_new_replies(db, changes, tools, profile)
+    for b in found:
+        console.print(Panel(escape(b.text()), title=escape(b.title), expand=False))
+        send_summary(b.text(), get_settings())
+    if folder is not None and found:
+        write_files(found, folder)
+    return found
+
+
 def _print_changes(changes: list[Change]) -> None:
     if changes:
         console.print(f"\n[bold]Tracker[/bold]: {len(changes)} update{'s' if len(changes) != 1 else ''}")
@@ -242,8 +269,10 @@ def _print_changes(changes: list[Change]) -> None:
 
 
 @app.command()
-def track() -> None:
-    """Check your mailbox for drafts you've sent, and for replies and bounces; record each company's stage."""
+def track(briefs: Optional[Path] = BRIEFS_OPTION) -> None:
+    """Check your mailbox for drafts you've sent, and for replies and bounces; record each company's stage.
+
+    A new reply also gets a company brief, sent to Telegram/Discord when they're set up."""
     settings = get_settings()
     if not settings.track_mailbox:
         console.print("TRACK_MAILBOX is off, so nothing is checked.")
@@ -260,10 +289,49 @@ def track() -> None:
         console.print("[yellow]Your Gmail token can only write drafts, so only drafts that left Drafts are seen "
                       "('draft gone'). Sent, replies and bounces need read access: run once with JOB_ALERTS=1 "
                       "to sign in with it.[/yellow]")
-    changes = update_stages(_db(), gmail, can_read)
+    db = _db()
+    changes = update_stages(db, gmail, can_read)
     _print_changes(changes)
     if not changes:
         console.print("No changes.")
+        return
+    try:
+        profile = load_profile()
+    except ProfileError as exc:
+        console.print(f"[yellow]No reply brief: {exc}[/yellow]")
+        return
+    _reply_briefs(db, changes, profile, _brief_tools, briefs)
+
+
+@app.command()
+def brief(
+    domain: str = typer.Argument(..., help="The company's website or domain."),
+    new: bool = typer.Option(False, "--new", help="Write a fresh brief even if one is saved."),
+) -> None:
+    """Show the brief written when a company replied, or write one now (#16)."""
+    try:
+        name = domain_of(normalize_url(domain))
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(2)
+    db = _db()
+    row = next((r for r in db.drafted() if r["domain"] == name), None)
+    if row is None:
+        console.print(f"[red]{name} has no draft, so there's nothing to brief.[/red]")
+        raise typer.Exit(1)
+    if row["reply_brief"] and not new:
+        console.print(escape(row["reply_brief"]))
+        return
+    try:
+        profile = load_profile()
+        scraper, extractor = _brief_tools()
+        b = write_brief(db.company_url(name), row["company_name"] or name, scraper, extractor, profile)
+    except (ProfileError, ScrapeError, ExtractionError) as exc:
+        console.print(f"[red]No brief: {exc}[/red]")
+        raise typer.Exit(1)
+    rb = ReplyBrief(name, row["company_name"] or name, "", row["replied_at"] or "", b)
+    db.save_brief(name, rb.markdown())
+    console.print(escape(rb.markdown()))
 
 
 @app.command()

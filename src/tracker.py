@@ -60,6 +60,7 @@ class Change:
     company: str
     stage: str
     at: str
+    who: str = ""  # for a reply: the sender's name as their email shows it, e.g. "Ada Lovelace"
 
 
 def _day_before(iso: Optional[str]) -> str:
@@ -86,13 +87,19 @@ def update_stages(db: Database, mailbox: Mailbox, can_read: bool) -> list[Change
             continue
         if new is not None and new[0] != stage:
             db.set_stage(domain, new[0], "mailbox", new[1])
-            changes.append(Change(domain, company, new[0], new[1]))
+            changes.append(Change(domain, company, *new))
     return changes
 
 
+def _sender_name(headers: dict[str, str]) -> str:
+    """The display name only ("Ada Lovelace"), never the address: it's shown in messages to your phone."""
+    name = parseaddr(headers.get("from", ""))[0].strip().strip('"')
+    return "" if "@" in name else name
+
+
 def _next_stage(row, address: str, stage: Optional[str], mailbox: Mailbox,
-                can_read: bool) -> Optional[tuple[str, str]]:
-    """(stage, when) the mailbox shows now, or None when nothing new can be told."""
+                can_read: bool) -> Optional[tuple[str, ...]]:
+    """(stage, when[, who]) the mailbox shows now, or None when nothing new can be told."""
     if stage is None:
         if row["draft_id"] and mailbox.draft_exists(row["draft_id"]):
             return None  # still in Drafts
@@ -113,7 +120,9 @@ def _next_stage(row, address: str, stage: Optional[str], mailbox: Mailbox,
             return ("bounced", _iso(min(bounced)))
         domain = address.rsplit("@", 1)[-1]
         found = mailbox.message_headers(f"from:{domain} after:{since}", REPLY_HEADERS, limit=10)
-        replies = [d for h in found if is_human_reply(h, domain) and (d := header_date(h.get("date", "")))]
+        replies = [(d, _sender_name(h)) for h in found
+                   if is_human_reply(h, domain) and (d := header_date(h.get("date", "")))]
         if replies:
-            return ("replied", _iso(min(replies)))
+            when, who = min(replies)
+            return ("replied", _iso(when), who)
     return None

@@ -151,6 +151,7 @@ python main.py status
 
 # The tracker: check now which drafts you sent and which got a reply or bounced (every real `run` does this too)
 python main.py track
+python main.py brief example-startup.com            # the company brief written when they replied
 python main.py mark example-startup.com interview   # stages the mailbox can't see: interview, offer, closed
 python main.py export --csv tracker.csv              # every draft and its stage, for a spreadsheet
 python main.py followups --dry-run                   # preview the follow-ups due (every real `run` drafts them too)
@@ -211,6 +212,29 @@ Your Name
   (7) days. `FOLLOW_UP_AFTER_DAYS=0` turns follow-ups off.
 - It's a draft like everything else: read it, edit it, and send it yourself, or delete it.
 - `python main.py followups --dry-run` shows what would be drafted; `followups` drafts them now.
+
+### When a founder replies: a company brief on your phone
+
+The moment the tracker sees a new reply, seedreach reads the company's site again and writes a short
+brief to prepare with:
+
+- what they build, and for whom
+- signs of their stack and architecture, only as the site shows them
+- anything recent on the site (launches, releases, funding)
+- which of your projects is closest to their work, and why
+- five specific questions to ask
+
+It reaches you right away:
+
+- **Telegram or Discord**, if you set them up (see "Run it on a schedule"), as one message.
+- **A new GitHub issue** in your runner repo, titled e.g. *Ada at Shiplog replied*, which @-mentions
+  you so the GitHub mobile app notifies you. The scheduled-runs template checks for replies every 2 hours
+  during the day, not just once a day.
+- On your computer, `python main.py brief <domain>` shows it again; `--new` writes a fresh one.
+
+Each company gets one brief. It's built from the company's public website and your profile only: seedreach
+never reads the reply itself, and the brief contains no email addresses. It never answers for you, either:
+reply from Gmail. Afterwards, `mark <domain> interview` (or offer, closed) keeps the tracker up to date.
 
 ### LinkedIn connection notes
 
@@ -434,10 +458,17 @@ found), drafts to review, and a LinkedIn connection note and after-accept messag
 ready to copy. It never contains email addresses. Nothing to report
 means no comment.
 
+**When a founder replies**, a separate new issue is opened with the company brief (see "When a founder
+replies" above), and it @-mentions you too. Besides the daily run, the template runs `track` alone every 2
+hours from 09:30 to 21:30 IST, so a reply reaches you within about 2 hours. Each check takes a minute or
+two, about 400 of the 2,000 free Actions minutes a month for a private repo; delete its `cron` line to check
+once a day. Seeing replies needs a `GMAIL_TOKEN` with read access (`JOB_ALERTS=1` at sign-in gives it).
+
 For a one-line summary on Telegram or Discord as well ("3 new drafts: HillStar, Alter · 2 skipped · 4 new
 from job alerts"), add the secrets `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, and/or `DISCORD_WEBHOOK_URL`.
 It lists company names and counts only, including the count of new job-alert openings when there are any;
 it never includes email addresses, apply links or draft text. It's sent after real runs, not dry runs.
+A founder's reply also sends its company brief there, as its own message.
 
 - **Telegram**: message [@BotFather](https://t.me/BotFather), send `/newbot` and follow the prompts; it
   replies with the bot token. Send any message to your new bot, then open
