@@ -80,6 +80,10 @@ class Settings(BaseSettings):
     # haven't replied (needs the tracker's read access). 0 turns follow-ups off.
     follow_up_after_days: int = 7
     follow_ups_per_run: int = 5  # at most this many follow-up drafts per run, oldest first
+    # A LinkedIn connection note (at most this many characters) and an after-accept message for each named
+    # founder, to paste yourself (`python main.py linkedin`). 200 fits a free account's note; 300 with
+    # Premium. 0 turns them off. seedreach never logs in to or automates LinkedIn.
+    linkedin_note_max: int = 200
     # Keep only titles that say intern/internship/new grad/co-op. 0 keeps every role the portal sent.
     job_alert_internships_only: bool = True
     # Optional run summary after `run` to Telegram and/or Discord (company names and counts only);

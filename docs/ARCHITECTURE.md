@@ -63,7 +63,8 @@ python main.py run --limit 5
    with no follow-up yet, one short draft (`generate_followup`) joins the first email's Gmail thread
    (the thread id, `In-Reply-To`/`References`, and the same subject), at most `FOLLOW_UPS_PER_RUN` a run.
 7. **After the run**, `run --digest FILE` writes the digest (`src/digest.py`): roles to apply for,
-   founders to reach on LinkedIn and drafts to review, with no email addresses; the scheduled-runs
+   founders to reach on LinkedIn, drafts to review, and each named founder's LinkedIn note and after-accept
+   message (folded), with no email addresses; the scheduled-runs
    template posts it as a GitHub issue comment. If Telegram or Discord is configured, a one-line summary
    is sent too (`src/notify.py`).
 
@@ -83,13 +84,15 @@ A drafted company also has a **stage** (columns `stage`, `stage_source`, `stage_
 `draft gone` when the draft left Drafts with no sent copy found, or `interview`/`offer`/`closed` set with
 `mark`. Schema changes to existing tables go in `MIGRATIONS` in `src/db.py`, counted by
 `PRAGMA user_version`, so older databases (the runner's included) catch up when opened. Migration 2 adds
-`followup_draft_id` and `followed_up_at`, which keep follow-ups to one per company.
+`followup_draft_id` and `followed_up_at`, which keep follow-ups to one per company. Migration 3 adds
+`linkedin_note` and `linkedin_message` (`generate_linkedin`, saved on real runs for companies with a named
+founder and shown by `linkedin`).
 
 ## Where things live
 
 | Path | Responsibility |
 |---|---|
-| `main.py` | Typer CLI: `run`, `target`, `add-target`, `status`, `track`, `mark`, `export`, `followups` |
+| `main.py` | Typer CLI: `run`, `target`, `add-target`, `status`, `track`, `mark`, `export`, `followups`, `linkedin` |
 | `src/config.py` | Settings from `.env` (Pydantic `BaseSettings`) |
 | `src/profile.py` | Loads and validates `profile.json` (your details) |
 | `src/db.py` | SQLite: companies, statuses, event log, dedupe, run traces |
@@ -102,7 +105,7 @@ A drafted company also has a **stage** (columns `stage`, `stage_source`, `stage_
 | `src/sourcing/` | Lead sources: one module per source |
 | `src/intelligence/` | `scraper.py` (HTML to text) and `extractor.py` (LLM to `CompanyProfile`) |
 | `src/enrichment/` | `email_finder.py`, `job_boards.py` (open internships on public job boards) and `company_facts.py` (company size from Apollo) |
-| `src/outreach/` | `generator.py` (email text) and `gmail_client.py` (creates drafts, never sends; reads job-alert emails only with `JOB_ALERTS=1`, and message dates for the tracker only if the token already allows reading) |
+| `src/outreach/` | `generator.py` (email, follow-up and LinkedIn note text) and `gmail_client.py` (creates drafts, never sends; reads job-alert emails only with `JOB_ALERTS=1`, and message dates for the tracker only if the token already allows reading) |
 | `tests/test_core.py`, `tests/test_job_boards.py` | Tests; every network and LLM call is faked (job-board fixtures are recorded real responses) |
 
 ## Adding a lead source

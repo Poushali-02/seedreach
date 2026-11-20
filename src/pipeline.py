@@ -17,7 +17,7 @@ from src.enrichment.company_facts import CompanyFactsClient
 from src.enrichment.job_boards import JobBoardChecker
 from src.intelligence.extractor import ExtractionError, Extractor, clearly_not_software
 from src.intelligence.scraper import ScrapeError, Scraper
-from src.outreach.generator import EmailDraft, company_text, generate_email
+from src.outreach.generator import EmailDraft, LinkedInText, company_text, generate_email, generate_linkedin
 from src.outreach.gmail_client import GmailDraftClient, GmailError, token_can_read
 from src.profile import load_profile
 from src.sourcing.base import BaseSourcingProvider, Lead, parse_preferences, region_rank
@@ -60,6 +60,7 @@ class Result:
     apply_url: Optional[str] = None
     role_posted: Optional[date] = None  # when that opening was first posted, if the board says
     size: str = ""  # e.g. "Seed, ~7 people" (Apollo)
+    linkedin: Optional[LinkedInText] = None  # a note and message for the founder, when one is named (#20)
 
 
 def build_providers(settings: Settings, names: str = "all") -> list[BaseSourcingProvider]:
@@ -266,11 +267,18 @@ class Pipeline:
                 self._record("INFO", domain, f"{stale} internship(s) posted over {max_age} days ago not named")
             if boards.problems:
                 self._record("INFO", domain, f"job boards not read: {', '.join(boards.problems)}")
+        linkedin = (generate_linkedin(company, self.profile, self.settings.linkedin_note_max, role)
+                    if self.settings.linkedin_note_max > 0 else None)
         about = dict(company=company.company_name, founder=founder, role=role, apply_url=apply_url,
-                     role_posted=role_posted, size=facts.summary() if facts else "")
+                     role_posted=role_posted, size=facts.summary() if facts else "", linkedin=linkedin)
+
+        def keep_linkedin() -> None:  # after the company's row is written, so the UPDATE finds it
+            if linkedin and not self.dry_run:
+                self.db.save_linkedin(domain, linkedin.note, linkedin.message)
 
         def skip(reason: str) -> Result:
             result = self._skip(domain, url, source, reason, company_name=company.company_name, founder_name=founder)
+            keep_linkedin()
             return replace(result, **about)
 
         with trace.timed("email"):
@@ -307,6 +315,7 @@ class Pipeline:
             domain, url, source, company_name=company.company_name, founder_name=founder,
             founder_email=email.email, email_source=f"{email.source} ({email.confidence})", draft_id=draft_id,
         )
+        keep_linkedin()
         self._record("INFO", domain, f"drafted to {email.email} via {email.source}{role_note}")
         return Result(domain, "drafted", f"{email.source}: {email.confidence}{role_note}", draft, email.email,
                       **about)

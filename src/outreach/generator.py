@@ -4,6 +4,8 @@ Two styles, chosen by `email_style` in profile.json:
   short (default)  greeting, the opener, who you are, one project, one ask, two links: ~100-130 words
   long             every section: role pitch, all matching projects, experience, stack, closing, all links
 A follow-up (`generate_followup`) is always short: a reminder, the same ask, the resume.
+For LinkedIn (`generate_linkedin`): a connection note within the note limit, and a longer message to send once
+they accept. Text only: you paste them yourself; seedreach never touches LinkedIn.
 """
 
 from __future__ import annotations
@@ -92,6 +94,60 @@ def _long(company: CompanyProfile, profile: Profile, name: str, greeting: str, r
         "\n".join(_links(profile, 3)),
         f"Best,\n{signature}",
     ]
+
+
+@dataclass(frozen=True)
+class LinkedInText:
+    note: str     # the connection-request note, within the note limit
+    message: str  # the longer message to send once they accept
+
+
+NOTE_ASK = "Would love to connect."
+_CLAUSE_BREAKS = (", and ", ", so ", "; ", " and I ", ", which ", " - ")
+
+
+def _fit_sentence(sentence: str, budget: int) -> str:
+    """The sentence, or its first clause, ending with a full stop, within `budget` characters; else ""."""
+    s = sentence.strip().rstrip(".?!")
+    if len(s) + 1 <= budget:
+        return s + "."
+    for sep in _CLAUSE_BREAKS:
+        head = s.split(sep, 1)[0].rstrip(",")
+        if 30 <= len(head) and len(head) + 1 <= budget:
+            return head + "."
+    return ""
+
+
+def generate_linkedin(company: CompanyProfile, profile: Profile, limit: int = 200,
+                      role: Optional[str] = None) -> Optional[LinkedInText]:
+    """A connection note (at most `limit` characters) and a longer after-accept message, for a named founder.
+
+    The note is: hi, who you are, the opener shortened to a full clause, an ask to connect. It never ends
+    mid-word: parts that don't fit are dropped, the opener first. None when the site names no founder,
+    since a note goes to a person.
+    """
+    first = strip_markdown(company.founder_first_name or "").split(" ")[0]
+    if not first:
+        return None
+    name = display_name(company.company_name)
+    intro = re.sub(r"\s*\([^)]*\)", "", profile.intro).strip().rstrip(".")  # "(expected 2028)" etc. dropped
+    greeting, me = f"Hi {first},", f"I'm {profile.first_name}, {intro}."
+    if len(f"{greeting} {me} {NOTE_ASK}") > limit:
+        me = f"I'm {profile.first_name}."
+    budget = limit - len(f"{greeting} {me}  {NOTE_ASK}")
+    hook = _fit_sentence(strip_markdown(company.personalized_hook), budget) or \
+        _fit_sentence(f"I came across {name}", budget)
+    note = " ".join(p for p in (greeting, me, hook, NOTE_ASK) if p)
+    if len(note) > limit:  # a very long name or a tiny limit: the bare minimum
+        note = f"{greeting} {NOTE_ASK}"[:limit]
+
+    sections = _short(company, profile, name, greeting, _role_line(role))
+    sections[0] = f"{greeting} thanks for connecting!"
+    sections[-1] = profile.first_name  # a message, not a letter: no "Best," block
+    message = "\n\n".join(s for s in sections if s) + "\n"
+    _assert_plain_text(note)
+    _assert_plain_text(message)
+    return LinkedInText(note=note, message=message)
 
 
 def generate_followup(company_name: str, founder_name: Optional[str], profile: Profile, sent_at: datetime,
