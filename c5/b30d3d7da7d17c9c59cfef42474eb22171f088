@@ -1,0 +1,90 @@
+main.py
+  s_70c212b3c8caf1::t_cf44509887694d 149-150
+src/briefs.py
+  s_70c212b3c8caf1::t_49979becd2dc29 1-71,73-76,78-119,121-137,139-202
+src/db.py
+  s_70c212b3c8caf1::t_0bc3405022a954 91-95
+  s_70c212b3c8caf1::t_9bb10e779d01cd 336
+  s_70c212b3c8caf1::t_e43df86e5432cb 366-381
+src/notify.py
+  s_70c212b3c8caf1::t_c334870ec2cd5f 29
+src/outreach/gmail_client.py
+  s_70c212b3c8caf1::t_201cc8c6c2684e 180-182,189-191,196-205
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "c5b30d3d7da7d17c9c59cfef42474eb22171f088",
+  "branch": "feat/reply-brief",
+  "prompts": {
+    "s_70c212b3c8caf1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e96e1c17-ea26-442f-b5b0-d2999a0c8e82",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:11799929b687bd9fc2b6b1032fcbe87960a9938756d230b7f6ab32075cca79e5",
+      "total_additions": 236,
+      "total_deletions": 6,
+      "accepted_lines": 239,
+      "overriden_lines": 4
+    }
+  },
+  "sessions": {
+    "s_70c212b3c8caf1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e96e1c17-ea26-442f-b5b0-d2999a0c8e82",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:11799929b687bd9fc2b6b1032fcbe87960a9938756d230b7f6ab32075cca79e5",
+      "stats": {
+        "total_additions": 236,
+        "total_deletions": 6,
+        "accepted_lines": 239,
+        "overriden_lines": 4,
+        "files": {
+          "main.py": {
+            "total_additions": 2,
+            "total_deletions": 1,
+            "accepted_lines": 2,
+            "overriden_lines": 0
+          },
+          "src/briefs.py": {
+            "total_additions": 190,
+            "total_deletions": 0,
+            "accepted_lines": 198,
+            "overriden_lines": 4
+          },
+          "src/db.py": {
+            "total_additions": 22,
+            "total_deletions": 1,
+            "accepted_lines": 22,
+            "overriden_lines": 0
+          },
+          "src/notify.py": {
+            "total_additions": 1,
+            "total_deletions": 1,
+            "accepted_lines": 1,
+            "overriden_lines": 0
+          },
+          "src/outreach/gmail_client.py": {
+            "total_additions": 16,
+            "total_deletions": 2,
+            "accepted_lines": 16,
+            "overriden_lines": 0
+          },
+          "tests/test_core.py": {
+            "total_additions": 5,
+            "total_deletions": 1,
+            "accepted_lines": 0,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  },
+  "integrity": {"v":1,"commit":"c5b30d3d7da7d17c9c59cfef42474eb22171f088","tree":"e52ca311d463e04ad84b5b731b27cddcfe903d93","files":{"main.py":"9e2c7ef43fcee8d25c3db5a11dfe773887566362","src/briefs.py":"504fe0afe339e568e0c46c8f4fd1881a99db5616","src/db.py":"db49fc54d1fcb7e47074a53c99d50f589c06a25d","src/notify.py":"10c8e6c8153ed5254411496c0dbe202d0983eb7b","src/outreach/gmail_client.py":"a494fe2ea60865bc7b2af07cb99c6c876fdaffbd"},"digest":"03903888f1311ecaaf4dc77ab07b0e85de724684969f651d858c528b4acc26e4"}
+}
