@@ -1,0 +1,9 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "b3c13f632796afa83ed2920f72b25735f6a13848",
+  "branch": "docs/changelog-tidy",
+  "prompts": {},
+  "integrity": {"v":1,"commit":"b3c13f632796afa83ed2920f72b25735f6a13848","tree":"1ee0942784925c6ff8b3ed1583eb4f6d98cf6ea8","files":{},"digest":"4f3329400dc14d1a730d140da4744e2ecbb7997a1f1beb4d652fe13d65c90b1a"}
+}
