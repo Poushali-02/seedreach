@@ -9,8 +9,9 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 - Show recent job openings from alert emails in `python main.py status` (#83).
 - LinkedIn connection notes (#20). When the site names a founder, seedreach writes a connection note
   within LinkedIn's limit (`LINKEDIN_NOTE_MAX`, 200 by default; 0 turns it off) and a longer message to
-  send once they accept. `python main.py linkedin [domain]` shows them, and the run digest adds the note to
-  each founder it lists to reach on LinkedIn. You paste them yourself: seedreach never logs in to LinkedIn.
+  send once they accept. Both are in the run digest, so with scheduled runs they reach your phone in the
+  GitHub comment; `python main.py linkedin [domain]` shows them on your computer. You paste them yourself:
+  seedreach never logs in to LinkedIn.
 
 ## [0.8.0] - 2026-11-20
 

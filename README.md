@@ -228,9 +228,11 @@ notes across monorepo packages. Would love to connect.
 - The after-accept message is the short email as a message: "thanks for connecting", the opener, one
   project, your ask and links, signed with your first name.
 - It's written for every company that passes the filters and names a founder, drafted or not (no address
-  found, or *Needs a contact*), on real runs only: a dry run shows it without saving it. The run digest
-  adds the note to each founder it lists to reach on LinkedIn.
-- `python main.py linkedin` lists the latest notes with a LinkedIn search link to each founder;
+  found, or *Needs a contact*), on real runs only: a dry run shows it without saving it.
+- **On your phone:** with scheduled runs, the digest comment on GitHub has a *LinkedIn notes* section:
+  each founder's LinkedIn link, the note to copy, and the after-accept message folded underneath. No laptop
+  needed.
+- On your computer, `python main.py linkedin` lists the latest notes with a LinkedIn search link to each founder;
   `python main.py linkedin <domain>` adds the after-accept message.
 
 ## How it works
@@ -428,7 +430,8 @@ put that in `SEEDREACH_REF`, push, and do a dry run.
 **On your phone:** each run posts a short digest as a comment on one issue in the runner repo, titled
 *seedreach: apply and reach out*, and @-mentions you, so the GitHub mobile app notifies you. It lists open
 internships with apply links, founders to reach on LinkedIn (when only a generic or guessed address was
-found) and drafts to review. It has company names and links only, never email addresses. Nothing to report
+found), drafts to review, and a LinkedIn connection note and after-accept message for each named founder,
+ready to copy. It never contains email addresses. Nothing to report
 means no comment.
 
 For a one-line summary on Telegram or Discord as well ("3 new drafts: HillStar, Alter · 2 skipped · 4 new

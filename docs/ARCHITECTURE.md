@@ -63,7 +63,8 @@ python main.py run --limit 5
    with no follow-up yet, one short draft (`generate_followup`) joins the first email's Gmail thread
    (the thread id, `In-Reply-To`/`References`, and the same subject), at most `FOLLOW_UPS_PER_RUN` a run.
 7. **After the run**, `run --digest FILE` writes the digest (`src/digest.py`): roles to apply for,
-   founders to reach on LinkedIn (with each one's connection note) and drafts to review, with no email addresses; the scheduled-runs
+   founders to reach on LinkedIn, drafts to review, and each named founder's LinkedIn note and after-accept
+   message (folded), with no email addresses; the scheduled-runs
    template posts it as a GitHub issue comment. If Telegram or Discord is configured, a one-line summary
    is sent too (`src/notify.py`).
 

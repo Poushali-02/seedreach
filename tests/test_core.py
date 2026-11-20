@@ -1997,5 +1997,15 @@ def test_cli_linkedin_and_digest_show_the_note(tmp_path: Path, monkeypatch: pyte
 
     reach = Result("useshiplog.com", "skipped", "needs contact: guessed ada@useshiplog.com, not verified",
                    company="Shiplog", founder="Ada Lovelace", linkedin=li)
-    digest = build_digest([reach])
-    assert f"  > {li.note}" in digest and "@" not in digest  # the note, and still no email address
+    drafted = Result("ramp.com", "drafted", "mailto: on site", to="ada@ramp.com", company="Ramp",
+                     founder="Ada Byron", linkedin=li)
+    digest = build_digest([reach, drafted])
+    notes = digest.split("### LinkedIn notes", 1)[1]  # both on the phone: a needs-contact founder and a drafted one
+    assert "**Shiplog** (useshiplog.com): Ada Lovelace, [find on LinkedIn](" in notes
+    assert "**Ramp** (ramp.com): Ada Byron, [find on LinkedIn](" in notes
+    assert notes.count(f"> {li.note}") == 2  # a blockquote, which wraps on a phone screen
+    assert notes.count("<details><summary>After they accept</summary>") == 2  # the long message, folded
+    assert "> Hi Ada, thanks for connecting!\n>\n> " in notes  # paragraphs kept inside the quote
+    assert "@" not in digest  # still no email address
+    assert build_digest([dataclasses.replace(drafted, outcome="skipped", detail="no founder email found")]).startswith(
+        "### LinkedIn notes")  # no address at all: the note is the only way in, so it's still listed
