@@ -1,0 +1,9 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "f700c175dabc3af3f7795b5a806ed7bb6a810173",
+  "branch": "feat/reply-brief",
+  "prompts": {},
+  "integrity": {"v":1,"commit":"f700c175dabc3af3f7795b5a806ed7bb6a810173","tree":"14c8bedf91f8202f26ac409cbeb8475721bd5f80","files":{},"digest":"742bd74be1b12dec1b8a840a48f81ff58aa368d80b58517f9e76c0f1e22fde69"}
+}
