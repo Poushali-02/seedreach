@@ -1,0 +1,60 @@
+main.py
+  s_d9278f5a40a45c::t_cd06d90d1d202c 351
+  s_d9278f5a40a45c::t_30c46b70f06bbd 359
+src/outreach/generator.py
+  s_d9278f5a40a45c::t_6cd6c0b62124cb 7-8
+  s_d9278f5a40a45c::t_bd7be5d8e909c2 99-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.9.1",
+  "base_commit_sha": "6b7154db2cf17308a62078f228454b198c7d1d96",
+  "branch": "feat/linkedin-note",
+  "prompts": {
+    "s_d9278f5a40a45c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c7adbdd3-ce18-4f56-95d0-1adeba687632",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:48de5ae04c07ce9cb229bb3f19506b244643fbc83d28b6c33106f38cfb764e92",
+      "total_additions": 58,
+      "total_deletions": 4,
+      "accepted_lines": 58,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_d9278f5a40a45c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c7adbdd3-ce18-4f56-95d0-1adeba687632",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Poushali Bhattacharyya <poushalibhattacharyya02@gmail.com>",
+      "messages_url": "cas:48de5ae04c07ce9cb229bb3f19506b244643fbc83d28b6c33106f38cfb764e92",
+      "stats": {
+        "total_additions": 58,
+        "total_deletions": 4,
+        "accepted_lines": 58,
+        "overriden_lines": 0,
+        "files": {
+          "main.py": {
+            "total_additions": 2,
+            "total_deletions": 4,
+            "accepted_lines": 2,
+            "overriden_lines": 0
+          },
+          "src/outreach/generator.py": {
+            "total_additions": 56,
+            "total_deletions": 0,
+            "accepted_lines": 56,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  },
+  "integrity": {"v":1,"commit":"6b7154db2cf17308a62078f228454b198c7d1d96","tree":"54afb6445560359e4f47348aef3abdc5fa12f6ef","files":{"main.py":"bf5fc96f84b155f5034b4201332e4843456e42f6","src/outreach/generator.py":"1ca32cc4d84aab2f45d5cdbc9e29e593606aa7c4"},"digest":"3ad60932bc91d72a8bed8321e67b741eb446ce7fa851d87d3e0125d6070bbcbd"}
+}
