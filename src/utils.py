@@ -25,16 +25,25 @@ JOB_BOARD_HOSTS = (
 NEWS_HOSTS = (
     "techcrunch.com", "mercurynews.com", "forbes.com", "businessinsider.com", "theverge.com", "wired.com",
     "venturebeat.com", "bloomberg.com", "reuters.com", "yourstory.com", "inc42.com", "economictimes.com",
-    "medium.com", "substack.com",
+    "medium.com", "substack.com", "entrackr.com",
+)
+INVESTOR_HOSTS = (
+    "sequoiacap.com", "a16z.com", "andreessenhorowitz.com", "accel.com", "matrixpartners.in",
+    "nexusvp.com", "lightspeedvp.com", "peakxv.com", "bessemervp.com", "tigerglobal.com",
+    "softbank.com", "softbankgroup.com", "blume.vc", "kalaari.com", "antler.co", "techstars.com",
+    "foundersfund.com", "benchmark.com", "greylock.com", "generalcatalyst.com", "indexventures.com",
+    "insightpartners.com", "coatue.com", "khoslaventures.com", "firstround.com", "elevationcapital.com",
+    "sosv.com", "omidyar.com", "bettercapital.vc", "chiratae.com", "indiaquotient.in",
 )
 _OTHER_NON_COMPANY = (
     "github.com", "twitter.com", "x.com", "notion.site", "notion.so", "docs.google.com", "drive.google.com",
     "calendly.com", "forms.gle", "typeform.com", "youtube.com", "t.me", "discord.gg",
+    "facebook.com", "instagram.com", "whatsapp.com",
 )
 
 
 def non_company_kind(host: str) -> str | None:
-    """'job_board', 'news' or 'other' if a page on this host can't be the company's own site, else None."""
+    """'job_board', 'news', 'investor' or 'other' if a page on this host can't be the company's own site, else None."""
     host = host.lower().rstrip(".")
 
     def on(suffixes: tuple[str, ...]) -> bool:
@@ -44,7 +53,14 @@ def non_company_kind(host: str) -> str | None:
         return "job_board"
     if on(NEWS_HOSTS):
         return "news"
+    if on(INVESTOR_HOSTS):
+        return "investor"
     return "other" if on(_OTHER_NON_COMPANY) else None
+
+
+def is_investor_host(host: str) -> bool:
+    host = host.lower().rstrip(".")
+    return any(host == s or host.endswith("." + s) for s in INVESTOR_HOSTS)
 
 
 def is_company_host(host: str) -> bool:

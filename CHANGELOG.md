@@ -5,6 +5,9 @@ All notable changes to seedreach are listed here. Versions follow [semantic vers
 
 ## [Unreleased]
 
+### Added
+- Funding news lead source (`--source funding`): finds newly funded startups from Inc42, Entrackr, and TechCrunch, respecting `robots.txt`, filtering out news and investor links, and tagging Indian startups for region preference.
+
 ## [0.9.0] - 2026-11-20
 
 Replies reach your phone: a company brief when a founder answers, and your LinkedIn notes in the digest.
