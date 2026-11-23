@@ -21,6 +21,7 @@ from src.outreach.generator import EmailDraft, LinkedInText, company_text, gener
 from src.outreach.gmail_client import GmailDraftClient, GmailError, token_can_read
 from src.profile import load_profile
 from src.sourcing.base import BaseSourcingProvider, Lead, parse_preferences, region_rank
+from src.sourcing.funding_news import FundingNewsProvider
 from src.sourcing.hacker_news import HackerNewsProvider
 from src.sourcing.job_alerts import AlertJob, gmail_query, jobs_in
 from src.sourcing.launch_hn import LaunchHNProvider
@@ -37,7 +38,12 @@ log = logging.getLogger(__name__)
 Reporter = Callable[["Result"], None]
 NEEDS_CONTACT = "needs contact"  # skip reason prefix: a company worth writing to, but no address we trust
 FOUNDER_INBOXES = {"founders", "founder"}  # generic-looking, but they reach the founders
-_PAGE_KIND = {"job_board": "a job-board page", "news": "a news article", "other": "not a company website"}
+_PAGE_KIND = {
+    "job_board": "a job-board page",
+    "news": "a news article",
+    "investor": "an investor website",
+    "other": "not a company website",
+}
 _BUSINESS = {"hardware": "makes hardware", "services": "sells a service", "other": "doesn't sell software"}
 
 
@@ -69,6 +75,7 @@ def build_providers(settings: Settings, names: str = "all") -> list[BaseSourcing
         "launchhn": LaunchHNProvider,
         "hn": HackerNewsProvider,
         "producthunt": ProductHuntProvider,
+        "funding": FundingNewsProvider,
     }
     if names == "all":
         return [factory(settings) for factory in available.values()]

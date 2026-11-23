@@ -136,7 +136,7 @@ python main.py run --limit 10 --dry-run
 
 # Real run: saves drafts to Gmail and records each company so it is never drafted twice
 python main.py run --limit 5
-python main.py run --limit 5 --source yc          # all | yc | launchhn | hn | producthunt
+python main.py run --limit 5 --source yc          # all | yc | launchhn | hn | producthunt | funding
 python main.py run --limit 5 --digest digest.md   # also write a short summary: roles to apply for, founders to reach
 
 # Queue your own list; the next `run` processes these before sourced leads
@@ -290,6 +290,10 @@ notes across monorepo packages. Would love to connect.
   searching its own comments returns nothing; the job posts are replies by other users.)
 - **Product Hunt**: reads the public feed and follows each post's outbound link. Best effort: Product Hunt
   sometimes blocks scrapers, in which case this source yields nothing.
+- **Funding news** (`funding`): reads funding announcements from Indian startup feeds (Inc42, Entrackr) and
+  TechCrunch startups, checks `robots.txt` before fetching, and extracts each company's own website while
+  filtering out news, social networks and investor links. Leads from Inc42 and Entrackr are tagged for
+  India region ranking.
 - **Extraction**: the LLM must return JSON matching a Pydantic schema (company, summary, domain, founder
   name, one-sentence technical hook). Invalid output is retried once, and busy errors are retried with
   backoff. Founder names are only taken if the site states them (About and Team pages are fetched too).

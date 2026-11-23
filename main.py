@@ -123,7 +123,7 @@ def _run_stats(traces: list[Trace]) -> None:
 @app.command()
 def run(
     limit: int = typer.Option(5, "--limit", "-n", min=1, help="Stop after this many drafts."),
-    source: str = typer.Option("all", "--source", "-s", help="all | yc | launchhn | hn | producthunt"),
+    source: str = typer.Option("all", "--source", "-s", help="all | yc | launchhn | hn | producthunt | funding"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print drafts; skip Gmail and don't touch the database."),
     include_large: bool = typer.Option(False, "--include-large", help="Process growth/large companies instead of "
                                        "skipping them. (Does not unskip previously skipped companies; use --force on target for that.)"),
